@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BYTEMON — Tu mascota digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<!-- Solo necesito esto si subo el archivo fuera de Claude (ver mis notas al final del código) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --shell:#1b1f2a;
+    --shell-hi:#262c3d;
+    --shell-lo:#12151d;
+    --screen:#0a1712;
+    --ink:#eaf2ee;
+    --muted:#8592a0;
+    --luz:#5eff9e;
+    --sombra:#ff4d8d;
+    --equilibrio:#ffb84d;
+    --accent:#8fe3a0;
+    --danger:#ff5c5c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 0%,#2a3142,#0d0f16 70%);
+    font-family:'Nunito',sans-serif;color:var(--ink);padding:18px;
+  }
+  .device{
+    width:100%;max-width:380px;background:linear-gradient(160deg,var(--shell-hi),var(--shell) 40%,var(--shell-lo));
+    border-radius:32px;padding:18px 18px 22px;box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+    border:1px solid #000;
+  }
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:2px 6px 14px;}
+  .brand{font-family:'Press Start 2P',monospace;font-size:11px;letter-spacing:1px;color:var(--accent2,var(--ink));}
+  .brand span{color:var(--luz);}
+  .agebadge{font-size:11px;color:var(--muted);font-weight:700;}
+  .screen-bezel{
+    position:relative;background:#000;border-radius:18px;padding:10px;
+    box-shadow:inset 0 0 0 3px #05070a, inset 0 0 30px rgba(0,0,0,.8);
+  }
+  .screen-inner{position:relative;border-radius:10px;overflow:hidden;background:var(--screen);}
+  canvas#screen{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;}
+  .scanlines{
+    position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 4px);
+    mix-blend-mode:multiply;
+  }
+  .glowring{
+    position:absolute;inset:-2px;border-radius:12px;pointer-events:none;
+    box-shadow:0 0 22px 2px var(--glow, transparent) inset;transition:box-shadow .6s;
+  }
+  .hud{
+    position:absolute;top:6px;left:8px;right:8px;display:flex;justify-content:space-between;
+    font-family:'Press Start 2P',monospace;font-size:8px;color:var(--luz);text-shadow:0 0 4px rgba(0,0,0,.9);
+  }
+  .pathtag{position:absolute;bottom:6px;right:8px;font-family:'Press Start 2P',monospace;font-size:7px;
+    color:var(--tagcolor,#666);text-shadow:0 0 4px rgba(0,0,0,.9);}
+  .stats{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
+  .stat-row{display:flex;align-items:center;gap:8px;}
+  .stat-icon{font-size:14px;width:18px;text-align:center;}
+  .bar-track{flex:1;height:9px;border-radius:5px;background:#000;box-shadow:inset 0 1px 3px rgba(0,0,0,.8);overflow:hidden;}
+  .bar-fill{height:100%;border-radius:5px;transition:width .4s ease;}
+  .fill-sac{background:linear-gradient(90deg,#ffb84d,#ffd98a);}
+  .fill-happy{background:linear-gradient(90deg,#ff8fd0,#ffc2e8);}
+  .fill-energy{background:linear-gradient(90deg,#5ec8ff,#a7e6ff);}
+  .fill-health{background:linear-gradient(90deg,#5eff9e,#baffcf);}
+  .fill-hyg{background:linear-gradient(90deg,#c9a0ff,#e6d3ff);}
+  .controls{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  button{
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;color:var(--ink);
+    background:linear-gradient(160deg,#333a4d,#20242f);border:1px solid #000;
+    border-radius:12px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    box-shadow:0 3px 0 #05060a, inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  button:active{transform:translateY(2px);box-shadow:0 1px 0 #05060a;}
+  button:disabled{opacity:.35;filter:grayscale(.6);}
+  button .ico{font-size:19px;}
+  .status-btn{grid-column:span 3;background:linear-gradient(160deg,#3a4256,#20242f);}
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    background:#0d0f16;border:1px solid #333;color:var(--ink);padding:9px 16px;border-radius:10px;
+    font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(5,6,10,.7);display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:20;
+  }
+  .modal{background:var(--shell);border-radius:20px;padding:20px;max-width:340px;width:100%;border:1px solid #000;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);}
+  .modal h3{margin:0 0 12px;font-family:'Press Start 2P',monospace;font-size:12px;color:var(--luz);}
+  .modal-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+  .modal-row b{color:var(--ink);}
+  .modal-row span{color:var(--muted);}
+  .modal input[type=text]{
+    width:100%;padding:9px 10px;border-radius:8px;border:1px solid #000;background:#11141c;color:var(--ink);
+    font-family:'Nunito';font-weight:700;margin-top:8px;font-size:13px;
+  }
+  .modal-actions{display:flex;gap:10px;margin-top:16px;}
+  .modal-actions button{flex:1;}
+  .close-x{background:none;border:none;box-shadow:none;color:var(--muted);font-size:20px;position:absolute;top:14px;right:16px;padding:0;}
+  .modal{position:relative;}
+  .gameover{text-align:center;}
+  .gameover .ico{font-size:40px;}
+  .footnote{font-size:10.5px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5;}
+  .tabrow{display:flex;gap:8px;margin-bottom:14px;}
+  .tabrow button{flex:1;padding:8px;}
+  .tabrow button.active{background:linear-gradient(160deg,var(--luz),#2a9);color:#0a1712;}
+  .vs{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+  .fighter{flex:1;text-align:center;}
+  .fighter b{display:block;font-size:13px;}
+  .fighter small{color:var(--muted);}
+  .hpbar{height:10px;border-radius:5px;background:#000;margin-top:6px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.8);}
+  .hpfill{height:100%;background:linear-gradient(90deg,#5eff9e,#baffcf);transition:width .4s;}
+  .vslabel{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--muted);}
+  .movegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;}
+  .battlelog{background:#0a1712;border-radius:10px;padding:10px;font-size:12px;color:var(--muted);
+    max-height:110px;overflow-y:auto;margin-top:12px;line-height:1.5;}
+  .challenge-item{display:flex;justify-content:space-between;align-items:center;padding:9px 4px;
+    border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
+  .challenge-item button{padding:6px 12px;}
+  .small-note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="device">
+  <div class="topbar">
+    <div class="brand">BYTE<span>MON</span></div>
+    <div class="agebadge" id="ageBadge">Edad: 0h</div>
+  </div>
+
+  <div class="screen-bezel">
+    <div class="screen-inner">
+      <canvas id="screen" width="480" height="480"></canvas>
+      <div class="glowring" id="glowring"></div>
+      <div class="hud">
+        <span id="hudName">COMPI</span>
+        <span id="hudStage">HUEVO</span>
+      </div>
+      <div class="pathtag" id="pathTag"></div>
+      <div class="scanlines"></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-row"><span class="stat-icon">🍖</span><div class="bar-track"><div class="bar-fill fill-sac" id="barSac"></div></div></div>
+    <div class="stat-row"><span class="stat-icon">💗</span><div class="bar-track"><div class="bar-fill fill-happy" id="barHappy"></div></div></div>
+    <div class="stat-row"><span class="stat-icon">⚡</span><div class="bar-track"><div class="bar-fill fill-energy" id="barEnergy"></div></div></div>
+    <div class="stat-row"><span class="stat-icon">✚</span><div class="bar-track"><div class="bar-fill fill-health" id="barHealth"></div></div></div>
+    <div class="stat-row"><span class="stat-icon">✨</span><div class="bar-track"><div class="bar-fill fill-hyg" id="barHyg"></div></div></div>
+  </div>
+
+  <div class="controls">
+    <button id="btnFeed"><span class="ico">🍖</span>Alimentar</button>
+    <button id="btnPlay"><span class="ico">🎮</span>Jugar</button>
+    <button id="btnClean"><span class="ico">🧹</span>Limpiar</button>
+    <button id="btnSleep"><span class="ico">😴</span>Dormir</button>
+    <button id="btnMed" disabled><span class="ico">💊</span>Medicina</button>
+    <button id="btnInfo"><span class="ico">📋</span>Estado</button>
+    <button id="btnBattle" class="status-btn"><span class="ico">⚔️</span>Batalla</button>
+  </div>
+
+  <div class="footnote">Cada usuario que abra este VPET tiene su propia mascota guardada — es personal e independiente.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="modalRoot"></div>
+
+<script>
+(function(){
+  // =======================================================================
+  // Esto es lo que tengo que rellenar si algún día alojo esto fuera de Claude
+  // Si lo abro dentro de Claude no toco nada, usa su propio almacenamiento.
+  // Si lo subo a mi hosting (Netlify, GitHub Pages...), pongo aquí los datos
+  // de mi proyecto Firebase gratuito (ya lo tengo hecho, es el "vpet")
+  // =======================================================================
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyA9ugnLWynAjK4TpFnHwWW-BkXfo_ljWsA",
+    authDomain: "vpet-77c73.firebaseapp.com",
+    projectId: "vpet-77c73",
+    storageBucket: "vpet-77c73.firebasestorage.app",
+    messagingSenderId: "556197497383",
+    appId: "1:556197497383:web:cbf509f199450fa04a9c02"
+  };
+
+  // ---------- cómo guardo los datos ----------
+  // Dentro de Claude uso window.storage, ya viene separado por usuario solo.
+  // Si lo tengo alojado fuera, uso Firestore + login anónimo: cada móvil o
+  // navegador saca su propio uid, así mis datos nunca se mezclan entre
+  // dispositivos. Lo "shared" (arena, ranking) sí lo ve todo el mundo,
+  // igual que pasaba dentro de Claude.
+  const CloudAdapter = (function(){
+    const hasClaudeStorage = typeof window !== 'undefined' && !!window.storage;
+    let fbReady = null;
+    let uid = null;
+
+    function initFirebase(){
+      if(fbReady) return fbReady;
+      fbReady = new Promise((resolve)=>{
+        if(typeof firebase === 'undefined'){ resolve(false); return; }
+        try{
+          firebase.initializeApp(FIREBASE_CONFIG);
+          const auth = firebase.auth();
+          auth.onAuthStateChanged((user)=>{
+            if(user){ uid = user.uid; resolve(true); }
+            else { auth.signInAnonymously().catch(()=>resolve(false)); }
+          });
+        }catch(e){ console.error('Firebase no configurado o inválido:', e); resolve(false); }
+      });
+      return fbReady;
+    }
+
+    function docRef(db, key, shared){
+      if(shared) return db.collection('shared_kv').doc(key);
+      return db.collection('users').doc(uid).collection('data').doc(key);
+    }
+
+    async function get(key, shared){
+      if(hasClaudeStorage){
+        try{ return await window.storage.get(key, !!shared); }catch(e){ return null; }
+      }
+      const ok = await initFirebase();
+      if(!ok) return null;
+      const db = firebase.firestore();
+      try{
+        const doc = await docRef(db, key, shared).get();
+        if(!doc.exists) return null;
+        return { key, value: doc.data().value, shared: !!shared };
+      }catch(e){ return null; }
+    }
+
+    async function set(key, value, shared){
+      if(hasClaudeStorage){
+        try{ return await window.storage.set(key, value, !!shared); }catch(e){ return null; }
+      }
+      const ok = await initFirebase();
+      if(!ok) return null;
+      const db = firebase.firestore();
+      try{
+        await docRef(db, key, shared).set({ value, updatedAt: Date.now() });
+        return { key, value, shared: !!shared };
+      }catch(e){ return null; }
+    }
+
+    return { get, set };
+  })();
+
+  const STORAGE_KEY = 'bytemon:pet';
+  const GRID = 24;
+  const canvas = document.getElementById('screen');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const cell = canvas.width / GRID;
+
+  const STAGE_NAMES = ['HUEVO','CRÍA','PEQUEÑO','JOVEN','PERFECTO','SUPREMO'];
+  const PATH_LABEL = {luz:'SENDA: LUZ', sombra:'SENDA: SOMBRA', equilibrio:'SENDA: EQUILIBRIO'};
+  const PATH_COLOR = {luz:'#5eff9e', sombra:'#ff4d8d', equilibrio:'#ffb84d'};
+  const SPECIES = {
+    luz:      { Activo:'Ventair',  Tranquilo:'Serenya' },
+    sombra:   { Activo:'Fangrax',  Tranquilo:'Umbrisk' },
+    equilibrio:{ Activo:'Tazuma',  Tranquilo:'Calmite' }
+  };
+  function speciesDisplay(pet){
+    if(!pet.speciesName) return STAGE_NAMES[pet.stage];
+    if(pet.stage===4) return pet.speciesName+' Mayor';
+    if(pet.stage===5) return pet.speciesName+' Supremo';
+    return pet.speciesName;
+  }
+
+  const AGE_HATCH = 3;
+  const AGE_CHILD = 15;
+  const AGE_ADULT = 40;
+  const AGE_PERFECT = 90;
+  const AGE_ULTIMATE = 160;
+  const TICK_MS = 4000;
+  const SICK_DEATH_TICKS = 14;
+
+  function freshPet(){
+    return {
+      name:'Compi', stage:0, path:null,
+      sac:80, happy:80, energy:80, health:100, hyg:100,
+      poops:0, poopTimer:0,
+      age:0, mistakes:0, sick:false, sickTicks:0, sleeping:false, alive:true,
+      sumHappy:0, sumSac:0, sumHyg:0, ticks:0,
+      lastMistakeFlags:{sac:false,happy:false,hyg:false},
+      temperament:null, feedCount:0, playCount:0, speciesName:null,
+      lastSaved: Date.now(), frame:0
+    };
+  }
+
+  let pet = freshPet();
+  let hasLoaded = false;
+
+  async function loadPet(){
+    try{
+      const res = await CloudAdapter.get(STORAGE_KEY, false);
+      if(res && res.value){
+        const loaded = JSON.parse(res.value);
+        pet = Object.assign(freshPet(), loaded);
+        catchUp();
+      }
+    }catch(e){ /* no había mascota guardada, me quedo con el huevo nuevo */ }
+    hasLoaded = true;
+    render();
+  }
+
+  async function savePet(){
+    pet.lastSaved = Date.now();
+    try{ await CloudAdapter.set(STORAGE_KEY, JSON.stringify(pet), false); }catch(e){ /* si falla el guardado no pasa nada, lo intento en el siguiente tick */ }
+  }
+
+  function catchUp(){
+    if(!pet.alive) return;
+    const elapsedMs = Date.now() - (pet.lastSaved || Date.now());
+    let missedTicks = Math.floor(elapsedMs / TICK_MS);
+    missedTicks = Math.max(0, Math.min(missedTicks, 60));
+    for(let i=0;i<missedTicks;i++){ tick(false); }
+  }
+
+  function clamp(v){ return Math.max(0, Math.min(100, v)); }
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(showToast._h);
+    showToast._h = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  function computePath(){
+    const avgHappy = pet.ticks ? pet.sumHappy/pet.ticks : pet.happy;
+    if(pet.mistakes <= 2 && avgHappy >= 70) return 'luz';
+    if(pet.mistakes >= 6 || avgHappy < 40) return 'sombra';
+    return 'equilibrio';
+  }
+
+  function checkEvolution(){
+    if(pet.stage===0 && pet.age>=AGE_HATCH){ pet.stage=1; showToast('¡El huevo ha eclosionado!'); }
+    else if(pet.stage===1 && pet.age>=AGE_CHILD){
+      pet.temperament = pet.playCount > pet.feedCount ? 'Activo' : 'Tranquilo';
+      pet.stage=2;
+      showToast(pet.name+' ha crecido — temperamento '+pet.temperament);
+    }
+    else if(pet.stage===2 && pet.age>=AGE_ADULT){
+      pet.path = computePath();
+      pet.speciesName = SPECIES[pet.path][pet.temperament||'Tranquilo'];
+      pet.stage=3;
+      showToast(pet.name+' ha digievolucionado en '+pet.speciesName+' — '+PATH_LABEL[pet.path]);
+    }
+    else if(pet.stage===3 && pet.age>=AGE_PERFECT){ pet.stage=4; showToast(pet.name+' alcanzó su forma Perfecta.'); }
+    else if(pet.stage===4 && pet.age>=AGE_ULTIMATE){ pet.stage=5; showToast(pet.name+' alcanzó su forma Suprema.'); }
+  }
+
+  function tick(doRender){
+    if(!pet.alive) return;
+    pet.age += 1;
+    pet.ticks += 1;
+    pet.sumHappy += pet.happy;
+    pet.sumSac += pet.sac;
+    pet.sumHyg += pet.hyg;
+
+    if(pet.stage>0){
+      if(pet.sleeping){
+        pet.energy = clamp(pet.energy + 6);
+        pet.sac = clamp(pet.sac - 1);
+        pet.happy = clamp(pet.happy - 1);
+      } else {
+        pet.sac = clamp(pet.sac - 3);
+        pet.happy = clamp(pet.happy - 2);
+        pet.energy = clamp(pet.energy - 2);
+      }
+
+      if(pet.poopTimer>0){
+        pet.poopTimer -= 1;
+        if(pet.poopTimer===0 && pet.poops<4){ pet.poops += 1; }
+      }
+      pet.hyg = clamp(100 - pet.poops*22);
+
+      // aquí cuento los fallos de cuidado, solo una vez cada vez que la barra toca fondo
+      const flags = pet.lastMistakeFlags;
+      if(pet.sac<=0 && !flags.sac){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.sac=true; }
+      if(pet.sac>10) flags.sac=false;
+      if(pet.happy<=0 && !flags.happy){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.happy=true; }
+      if(pet.happy>10) flags.happy=false;
+      if(pet.hyg<=0 && !flags.hyg){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.hyg=true; }
+      if(pet.hyg>10) flags.hyg=false;
+
+      if(pet.health<=0 && !pet.sick){ pet.sick=true; pet.sickTicks=0; }
+      if(pet.sick){
+        pet.sickTicks++;
+        if(pet.sickTicks>=SICK_DEATH_TICKS){
+          pet.alive=false;
+        }
+      }
+      checkEvolution();
+    }
+
+    if(doRender!==false){ render(); savePet(); }
+  }
+
+  // ---------- aquí dibujo el bicho en pixel art ----------
+  function px(gx,gy,color,w,h){
+    w=w||1; h=h||1;
+    ctx.fillStyle=color;
+    ctx.fillRect(Math.round(gx*cell), Math.round(gy*cell), Math.ceil(w*cell), Math.ceil(h*cell));
+  }
+  function ellipseCells(cx,cy,rx,ry){
+    const out=[];
+    for(let gy=Math.floor(cy-ry-1);gy<=Math.ceil(cy+ry+1);gy++){
+      for(let gx=Math.floor(cx-rx-1);gx<=Math.ceil(cx+rx+1);gx++){
+        const dx=(gx-cx)/rx, dy=(gy-cy)/ry;
+        if(dx*dx+dy*dy<=1) out.push([gx,gy]);
+      }
+    }
+    return out;
+  }
+
+  function palette(stage, path){
+    if(stage<=2){ return {body:'#8fe3a0', belly:'#eafff0', dark:'#4fae6c', accent:'#c8ffd6'}; }
+    if(path==='luz') return {body:'#4fd6ff', belly:'#dffaff', dark:'#1e9fd6', accent:'#5eff9e'};
+    if(path==='sombra') return {body:'#8a4fe0', belly:'#e3d1ff', dark:'#5a2ba8', accent:'#ff4d8d'};
+    return {body:'#ffb84d', belly:'#fff1d6', dark:'#d68f1e', accent:'#ffe08a'};
+  }
+
+  function drawEgg(frame){
+    const cx=12, cy=13;
+    ctx.fillStyle='#0a1712'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    const cells = ellipseCells(cx,cy,5.2,6.6);
+    cells.forEach(([gx,gy])=>px(gx,gy,'#fff3d6'));
+    // manchitas del cascarón
+    const spots=[[cx-2,cy-3],[cx+2,cy-1],[cx-1,cy+3],[cx+3,cy+2]];
+    spots.forEach(([gx,gy])=>px(gx,gy,'#ffd98a',1.3,1.3));
+    // grieta que aparece cuando ya casi va a eclosionar
+    if(frame%2===0){
+      px(cx-0.5,cy-4,'#caa15a'); px(cx,cy-3,'#caa15a'); px(cx+0.7,cy-2,'#caa15a');
+    }
+    // la sombrita en el suelo, para que no parezca que flota
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.beginPath(); ctx.ellipse(cx*cell, (cy+7)*cell, 5*cell,1.1*cell,0,0,Math.PI*2); ctx.fill();
+  }
+
+  function drawCreature(stage, path, frame, sick, sleeping, temperament){
+    ctx.fillStyle='#0a1712'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    const cx=12, cy=13.5;
+    const sizes = {1:[4.6,4.2],2:[5.6,5.0],3:[6.8,6.2],4:[7.8,7.2],5:[8.8,8.2]};
+    const [rx,ry] = sizes[stage];
+    const pal = palette(stage, path);
+    const bob = (frame%8<4)?0:0.4;
+    const bcy = cy+bob;
+
+    if(sick){ ctx.filter='saturate(0.35) brightness(0.85)'; }
+
+    // otra vez la sombrita del suelo, pero pegada al bicho ya crecido
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.beginPath(); ctx.ellipse(cx*cell, (cy+ry+2)*cell, (rx*0.9)*cell,1.1*cell,0,0,Math.PI*2); ctx.fill();
+
+    // esto va detrás del cuerpo: alas, cuernos u orejas según la senda
+    if(stage>=3){
+      const featScale = stage===3?1:(stage===4?1.35:1.7);
+      if(path==='luz'){
+        drawWings(cx,bcy,rx,ry,featScale,pal.accent);
+      } else if(path==='sombra'){
+        drawHorns(cx,bcy,rx,ry,featScale,pal.accent);
+      } else {
+        drawEars(cx,bcy,rx,ry,featScale,pal.accent);
+      }
+    }
+
+    // el cuerpo
+    ellipseCells(cx,bcy,rx,ry).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    // la barriguita más clara
+    ellipseCells(cx,bcy+ry*0.28,rx*0.62,ry*0.5).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+
+    // patitas cortas, desde que es Pequeño en adelante
+    if(stage>=2 && stage<=2){
+      px(cx-rx*0.55,bcy+ry*0.85,pal.dark,1.4,1.1);
+      px(cx+rx*0.15,bcy+ry*0.85,pal.dark,1.4,1.1);
+    }
+    if(stage>=3){
+      px(cx-rx*0.55,bcy+ry*0.9,pal.dark,1.6,1.3);
+      px(cx+rx*0.2,bcy+ry*0.9,pal.dark,1.6,1.3);
+    }
+
+    // en Supremo le añado el aura de chispas y la coronita
+    if(stage===5){
+      const spark = pal.accent;
+      const sparklePts = [[cx-rx-1.5,bcy-2],[cx+rx+1,bcy-3],[cx-rx-0.5,bcy+3],[cx+rx+1.5,bcy+2],[cx-2,bcy-ry-2.5],[cx+3,bcy-ry-2]];
+      sparklePts.forEach(([gx,gy])=>{ if((frame+Math.round(gx))%6<3) px(gx,gy,spark,0.9,0.9); });
+      px(cx-1.6,bcy-ry-1.2,pal.accent,3.2,0.9);
+      px(cx-0.7,bcy-ry-2,pal.accent,1.4,0.9);
+    }
+
+    // los ojos
+    const eyeY = bcy - ry*0.12;
+    const eyeDX = rx*0.42;
+    if(sleeping){
+      px(cx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5);
+      px(cx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5);
+      ctx.fillStyle='#dfeee6';
+      ctx.font='700 22px monospace';
+      ctx.fillText('Z', (cx+rx+1)*cell, (bcy-ry-2+((frame%16<8)?0:-1))*cell);
+    } else if(sick){
+      // ojos huecos/mareados, para cuando está enfermo
+      px(cx-eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
+      px(cx-eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
+      px(cx+eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
+      px(cx+eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
+    } else {
+      const blink = frame%20>=18;
+      const eh = blink?0.4:1.5;
+      px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+      px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+    }
+
+    // la boquita
+    if(!sleeping){
+      px(cx-0.7,bcy+ry*0.42,'#1a2620',1.4,0.5);
+    }
+
+    // el detallito del temperamento, desde que es Pequeño
+    if(stage>=2 && temperament){
+      const mx = cx+rx*0.55, my = bcy-ry-1.4;
+      if(temperament==='Activo'){
+        px(mx,my,'#ffe066',0.8,0.8); px(mx-0.6,my+0.7,'#ffe066',0.7,0.7); px(mx+0.5,my+1.1,'#ffe066',0.6,0.6);
+      } else {
+        px(mx,my,'#bfe8ff',0.9,0.9); px(mx-0.3,my+0.8,'#bfe8ff',0.6,0.6);
+      }
+    }
+
+    ctx.filter='none';
+  }
+
+  function drawWings(cx,cy,rx,ry,scale,color){
+    const w=1.6*scale, h=3.2*scale;
+    px(cx-rx-w*0.9, cy-h*0.3, color, w, h*0.5);
+    px(cx-rx-w*0.5, cy-h*0.55, color, w*0.7, h*0.4);
+    px(cx+rx-w*0.1, cy-h*0.3, color, w, h*0.5);
+    px(cx+rx+w*0.35, cy-h*0.55, color, w*0.7, h*0.4);
+  }
+  function drawHorns(cx,cy,rx,ry,scale,color){
+    const h=2.6*scale;
+    px(cx-rx*0.55,cy-ry-h,color,1.1,h);
+    px(cx-rx*0.55-0.4,cy-ry-h*0.5,color,0.7,h*0.5);
+    px(cx+rx*0.45,cy-ry-h,color,1.1,h);
+    px(cx+rx*0.45+0.4,cy-ry-h*0.5,color,0.7,h*0.5);
+  }
+  function drawEars(cx,cy,rx,ry,scale,color){
+    const r=1.5*scale;
+    ellipseCells(cx-rx*0.65,cy-ry*0.85,r*0.6,r).forEach(([gx,gy])=>px(gx,gy,color));
+    ellipseCells(cx+rx*0.65,cy-ry*0.85,r*0.6,r).forEach(([gx,gy])=>px(gx,gy,color));
+  }
+
+  function render(){
+    if(!hasLoaded) return;
+    document.getElementById('hudName').textContent = pet.name.toUpperCase();
+    document.getElementById('hudStage').textContent = speciesDisplay(pet);
+    document.getElementById('ageBadge').textContent = 'Edad: '+pet.age+'h';
+    const tag = document.getElementById('pathTag');
+    if(pet.path){ tag.textContent = PATH_LABEL[pet.path]; tag.style.setProperty('--tagcolor', PATH_COLOR[pet.path]); document.getElementById('glowring').style.setProperty('--glow', PATH_COLOR[pet.path]+'55'); }
+    else { tag.textContent=''; document.getElementById('glowring').style.setProperty('--glow','transparent'); }
+
+    document.getElementById('barSac').style.width = pet.sac+'%';
+    document.getElementById('barHappy').style.width = pet.happy+'%';
+    document.getElementById('barEnergy').style.width = pet.energy+'%';
+    document.getElementById('barHealth').style.width = pet.health+'%';
+    document.getElementById('barHyg').style.width = pet.hyg+'%';
+
+    document.getElementById('btnMed').disabled = !pet.sick;
+    document.getElementById('btnSleep').querySelector('.ico').textContent = pet.sleeping ? '⏰' : '😴';
+    document.getElementById('btnSleep').lastChild.textContent = pet.sleeping ? 'Despertar' : 'Dormir';
+    ['btnFeed','btnPlay','btnClean'].forEach(id=>document.getElementById(id).disabled = pet.sleeping || !pet.alive);
+    document.getElementById('btnMed').disabled = !pet.sick || !pet.alive;
+
+    if(!pet.alive){ renderGameOver(); return; }
+    removeGameOver();
+
+    pet.frame = (pet.frame||0)+1;
+    if(pet.stage===0) drawEgg(pet.frame);
+    else drawCreature(pet.stage, pet.path, pet.frame, pet.sick, pet.sleeping, pet.temperament);
+  }
+
+  function renderGameOver(){
+    let el = document.getElementById('gameOverModal');
+    if(el) return;
+    el = document.createElement('div');
+    el.id='gameOverModal';
+    el.className='modal-backdrop';
+    el.innerHTML = `<div class="modal gameover">
+      <div class="ico">💔</div>
+      <h3 style="margin-top:10px;">${pet.name} se ha ido</h3>
+      <p style="color:var(--muted);font-size:13px;">Vivió ${pet.age} horas virtuales antes de partir. Puedes empezar de nuevo con un huevo fresco.</p>
+      <div class="modal-actions"><button id="btnRestart">🥚 Nuevo huevo</button></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    document.getElementById('btnRestart').onclick = ()=>{
+      pet = freshPet();
+      removeGameOver();
+      render(); savePet();
+    };
+  }
+  function removeGameOver(){
+    const el = document.getElementById('gameOverModal');
+    if(el) el.remove();
+  }
+
+  // ---------- botones de acción ----------
+  document.getElementById('btnFeed').onclick = ()=>{
+    if(pet.stage===0 || pet.sleeping || !pet.alive) return;
+    pet.sac = clamp(pet.sac+28);
+    pet.happy = clamp(pet.happy+4);
+    pet.feedCount++;
+    if(pet.poopTimer===0 && pet.poops<4) pet.poopTimer = 3;
+    showToast(pet.name+' ha comido 🍖');
+    render(); savePet();
+  };
+  document.getElementById('btnPlay').onclick = ()=>{
+    if(pet.stage===0 || pet.sleeping || !pet.alive) return;
+    if(pet.energy<10){ showToast(pet.name+' está muy cansado para jugar'); return; }
+    pet.happy = clamp(pet.happy+22);
+    pet.energy = clamp(pet.energy-14);
+    pet.sac = clamp(pet.sac-6);
+    pet.playCount++;
+    showToast('¡'+pet.name+' se divirtió jugando! 🎮');
+    render(); savePet();
+  };
+  document.getElementById('btnClean').onclick = ()=>{
+    if(pet.stage===0 || !pet.alive) return;
+    if(pet.poops===0){ showToast('Ya está todo limpio ✨'); return; }
+    pet.poops=0; pet.poopTimer=0; pet.hyg=100;
+    showToast('Limpieza completa 🧹');
+    render(); savePet();
+  };
+  document.getElementById('btnSleep').onclick = ()=>{
+    if(pet.stage===0 || !pet.alive) return;
+    pet.sleeping = !pet.sleeping;
+    showToast(pet.sleeping ? (pet.name+' se ha dormido 😴') : (pet.name+' se ha despertado ⏰'));
+    render(); savePet();
+  };
+  document.getElementById('btnMed').onclick = ()=>{
+    if(!pet.sick || !pet.alive) return;
+    pet.sick=false; pet.sickTicks=0; pet.health=clamp(pet.health+40);
+    showToast(pet.name+' ha sido curado 💊');
+    render(); savePet();
+  };
+  document.getElementById('btnInfo').onclick = ()=>{
+    const el = document.createElement('div');
+    el.className='modal-backdrop';
+    el.id='infoModal';
+    el.innerHTML = `<div class="modal">
+      <button class="close-x" id="closeInfo">✕</button>
+      <h3>ESTADO</h3>
+      <div class="modal-row"><span>Etapa</span><b>${speciesDisplay(pet)}</b></div>
+      <div class="modal-row"><span>Senda</span><b>${pet.path?PATH_LABEL[pet.path]:'—'}</b></div>
+      <div class="modal-row"><span>Temperamento</span><b>${pet.temperament||'—'}</b></div>
+      <div class="modal-row"><span>Edad</span><b>${pet.age} h virtuales</b></div>
+      <div class="modal-row"><span>Fallos de cuidado</span><b>${pet.mistakes}</b></div>
+      <div class="modal-row"><span>Estado</span><b>${pet.sick?'Enfermo 🤒':(pet.sleeping?'Durmiendo 😴':'Bien 🙂')}</b></div>
+      <input type="text" id="nameInput" maxlength="12" value="${pet.name}">
+      <div class="modal-actions">
+        <button id="saveNameBtn">Guardar nombre</button>
+      </div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    document.getElementById('closeInfo').onclick=()=>el.remove();
+    el.addEventListener('click',(e)=>{ if(e.target===el) el.remove(); });
+    document.getElementById('saveNameBtn').onclick=()=>{
+      const v = document.getElementById('nameInput').value.trim();
+      if(v){ pet.name=v; render(); savePet(); }
+      el.remove();
+    };
+  };
+
+  // ---------- el sistema de batallas ----------
+  const BASE_POWER = {0:0,1:4,2:7,3:14,4:19,5:24};
+  const BEATS = {Ataque:'Especial', Especial:'Defensa', Defensa:'Ataque'};
+
+  function powerOf(p){
+    return BASE_POWER[p.stage] + (p.path?2:0) + Math.round((p.health!==undefined?p.health:100)/100*4);
+  }
+  function mySnapshot(){
+    return { name:pet.name, species:speciesDisplay(pet), stage:pet.stage, path:pet.path, power:powerOf(pet) };
+  }
+  function resolveMoves(moveA, moveB, powA, powB, pathA, pathB){
+    let dmgToA=0, dmgToB=0, text='';
+    if(moveA===moveB){
+      dmgToA = 9+Math.round(powB*0.6); dmgToB = 9+Math.round(powA*0.6);
+      text = 'Ambos usan '+moveA+' — chocan de igual a igual.';
+    } else if(BEATS[moveA]===moveB){
+      dmgToB = 17+powA; dmgToA = 5+Math.round(powB*0.4);
+      text = moveA+' vence a '+moveB+'.';
+    } else {
+      dmgToA = 17+powB; dmgToB = 5+Math.round(powA*0.4);
+      text = moveB+' vence a '+moveA+'.';
+    }
+
+    let healA=0, healB=0;
+    const extra=[];
+    if(moveA==='Especial'){
+      if(pathA==='luz'){ healA+=8; extra.push('la Senda Luz cura un poco de vida.'); }
+      else if(pathA==='sombra'){ dmgToB+=5; dmgToA+=3; extra.push('la Senda Sombra añade daño extra con retroceso.'); }
+      else if(pathA==='equilibrio'){ dmgToA=Math.max(0,dmgToA-5); extra.push('la Senda Equilibrio amortigua el golpe recibido.'); }
+    }
+    if(moveB==='Especial'){
+      if(pathB==='luz'){ healB+=8; extra.push('la Senda Luz rival cura algo de vida.'); }
+      else if(pathB==='sombra'){ dmgToA+=5; dmgToB+=3; extra.push('la Senda Sombra rival añade daño extra con retroceso.'); }
+      else if(pathB==='equilibrio'){ dmgToB=Math.max(0,dmgToB-5); extra.push('la Senda Equilibrio rival amortigua el golpe.'); }
+    }
+    if(extra.length) text += ' Además, '+extra.join(' Y ');
+    return {dmgToA, dmgToB, healA, healB, text};
+  }
+
+  let battleTimer = null;
+  function stopBattlePoll(){ if(battleTimer){ clearInterval(battleTimer); battleTimer=null; } }
+
+  function openBattleModal(){
+    if(pet.stage===0 || !pet.alive){ showToast('Tu mascota necesita nacer primero 🥚'); return; }
+    const el = document.createElement('div');
+    el.className='modal-backdrop'; el.id='battleModal';
+    el.innerHTML = `<div class="modal">
+      <button class="close-x" id="closeBattle">✕</button>
+      <h3>ARENA</h3>
+      <div class="tabrow">
+        <button id="tabLocal" class="active">Local</button>
+        <button id="tabOnline">Online</button>
+      </div>
+      <div id="battleContent"></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); el.remove(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); el.remove(); } });
+    function setTab(t){
+      stopBattlePoll();
+      document.getElementById('tabLocal').classList.toggle('active', t==='local');
+      document.getElementById('tabOnline').classList.toggle('active', t==='online');
+      if(t==='local') renderLocalSetup(); else renderOnlineHome();
+    }
+    document.getElementById('tabLocal').onclick=()=>setTab('local');
+    document.getElementById('tabOnline').onclick=()=>setTab('online');
+    setTab('local');
+  }
+
+  function renderLocalSetup(){
+    const c = document.getElementById('battleContent');
+    c.innerHTML = `
+      <p class="small-note">Combate local — pasad el mismo móvil entre los dos jugadores, sin conexión.</p>
+      <input type="text" id="p2name" placeholder="Nombre del rival" maxlength="12">
+      <select id="p2stage" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:#11141c;color:var(--ink);border:1px solid #000;">
+        <option value="1">Cría</option><option value="2">Pequeño</option>
+        <option value="3" selected>Joven</option><option value="4">Perfecto</option><option value="5">Supremo</option>
+      </select>
+      <select id="p2path" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:#11141c;color:var(--ink);border:1px solid #000;">
+        <option value="luz">Senda Luz</option><option value="sombra">Senda Sombra</option><option value="equilibrio">Senda Equilibrio</option>
+      </select>
+      <div class="modal-actions"><button id="startLocal">⚔️ Empezar combate</button></div>
+    `;
+    document.getElementById('startLocal').onclick=()=>{
+      const name = document.getElementById('p2name').value.trim() || 'Rival';
+      const stage = parseInt(document.getElementById('p2stage').value,10);
+      const path = document.getElementById('p2path').value;
+      const p2 = { name, species:'Invitado', stage, path, power: BASE_POWER[stage]+2 };
+      startLocalBattle(mySnapshot(), p2);
+    };
+  }
+
+  let localState = null;
+  function startLocalBattle(p1, p2){
+    localState = { p1:{...p1,hp:100,move:null}, p2:{...p2,hp:100,move:null}, log:[], turnOf:1 };
+    renderLocalBattle();
+  }
+  function renderLocalBattle(){
+    const c = document.getElementById('battleContent');
+    const s = localState;
+    if(!s) return;
+    const active = s.turnOf===1?s.p1:s.p2;
+    const finished = s.p1.hp<=0 || s.p2.hp<=0;
+    c.innerHTML = `
+      <div class="vs">
+        <div class="fighter"><b>${s.p1.name}</b><small>${s.p1.species}</small><div class="hpbar"><div class="hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div></div>
+        <div class="vslabel">VS</div>
+        <div class="fighter"><b>${s.p2.name}</b><small>${s.p2.species}</small><div class="hpbar"><div class="hpfill" style="width:${Math.max(0,s.p2.hp)}%"></div></div></div>
+      </div>
+      ${finished ? `<p style="text-align:center;font-weight:800;">${s.p1.hp<=0?s.p2.name:s.p1.name} gana la batalla 🏆</p>
+        <div class="modal-actions"><button id="againLocal">Volver a jugar</button></div>`
+      : `<p class="small-note" style="text-align:center;">Turno de <b>${active.name}</b> — elige movimiento:</p>
+        <div class="movegrid">
+          <button data-mv="Ataque">⚔️<br>Ataque</button>
+          <button data-mv="Especial">✨<br>Especial</button>
+          <button data-mv="Defensa">🛡️<br>Defensa</button>
+        </div>`}
+      <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
+    `;
+    if(!finished){
+      c.querySelectorAll('[data-mv]').forEach(btn=>{
+        btn.onclick=()=>{
+          const mv = btn.getAttribute('data-mv');
+          if(s.turnOf===1){ s.p1.move=mv; s.turnOf=2; renderLocalBattle(); }
+          else {
+            s.p2.move=mv;
+            const r = resolveMoves(s.p1.move, s.p2.move, s.p1.power, s.p2.power, s.p1.path, s.p2.path);
+            s.p1.hp = Math.min(100, Math.max(0, s.p1.hp - r.dmgToA + r.healA));
+            s.p2.hp = Math.min(100, Math.max(0, s.p2.hp - r.dmgToB + r.healB));
+            s.log.push(s.p1.name+' usó '+s.p1.move+' · '+s.p2.name+' usó '+s.p2.move+' — '+r.text);
+            s.p1.move=null; s.p2.move=null; s.turnOf=1;
+            renderLocalBattle();
+          }
+        };
+      });
+    } else {
+      document.getElementById('againLocal').onclick=()=>{ renderLocalSetup(); };
+    }
+  }
+
+  // ---- la arena online (con almacenamiento compartido) ----
+  const ARENA_OPEN_KEY = 'bytemon:arena:open';
+  function battleKey(id){ return 'bytemon:arena:battle:'+id; }
+
+  async function getOpenList(){
+    try{
+      const res = await CloudAdapter.get(ARENA_OPEN_KEY, true);
+      if(res && res.value) return JSON.parse(res.value);
+    }catch(e){}
+    return [];
+  }
+  async function setOpenList(list){
+    try{ await CloudAdapter.set(ARENA_OPEN_KEY, JSON.stringify(list), true); }catch(e){}
+  }
+
+  const LEADERBOARD_KEY = 'bytemon:leaderboard';
+  async function recordWin(winnerName, winnerSpecies){
+    let board = [];
+    try{
+      const res = await CloudAdapter.get(LEADERBOARD_KEY, true);
+      if(res && res.value) board = JSON.parse(res.value);
+    }catch(e){}
+    const idx = board.findIndex(b=>b.name===winnerName && b.species===winnerSpecies);
+    if(idx>=0) board[idx].wins++; else board.push({name:winnerName, species:winnerSpecies, wins:1});
+    board.sort((a,b)=>b.wins-a.wins);
+    board = board.slice(0,10);
+    try{ await CloudAdapter.set(LEADERBOARD_KEY, JSON.stringify(board), true); }catch(e){}
+  }
+  async function renderLeaderboard(){
+    const box = document.getElementById('leaderboardBox');
+    if(!box) return;
+    box.innerHTML = '<p class="small-note">Cargando ranking...</p>';
+    let board = [];
+    try{
+      const res = await CloudAdapter.get(LEADERBOARD_KEY, true);
+      if(res && res.value) board = JSON.parse(res.value);
+    }catch(e){}
+    if(board.length===0){ box.innerHTML = '<p class="small-note">Aún no hay victorias registradas. ¡Sé el primero!</p>'; return; }
+    box.innerHTML = board.map((b,i)=>`<div class="challenge-item"><span>#${i+1} ${b.name} <small style="color:var(--muted)">(${b.species})</small></span><b>${b.wins} 🏆</b></div>`).join('');
+  }
+
+  async function renderOnlineHome(){
+    const c = document.getElementById('battleContent');
+    c.innerHTML = `<p class="small-note">Combate online — cualquiera que abra este mismo VPET puede retarte, esté donde esté. Tu nombre y tu especie serán visibles para otros jugadores mientras el reto esté abierto.</p>
+      <div class="modal-actions">
+        <button id="createChallengeBtn">📣 Crear reto</button>
+        <button id="refreshChallengesBtn">🔄 Ver retos</button>
+      </div>
+      <div id="challengeList"></div>
+      <h3 style="font-size:11px;margin-top:18px;">🏆 RANKING GLOBAL</h3>
+      <div id="leaderboardBox"></div>`;
+    document.getElementById('createChallengeBtn').onclick = createChallenge;
+    document.getElementById('refreshChallengesBtn').onclick = loadOpenChallenges;
+    loadOpenChallenges();
+    renderLeaderboard();
+  }
+
+  async function createChallenge(){
+    let list = await getOpenList();
+    const now = Date.now();
+    list = list.filter(c => now - c.ts < 10*60*1000 && c.name);
+    const id = 'b'+now+Math.random().toString(36).slice(2,7);
+    const mine = mySnapshot();
+    list.push({ id, ...mine, ts: now });
+    await setOpenList(list);
+    showToast('Reto publicado — esperando rival...');
+    waitForOpponent(id, mine);
+  }
+
+  function waitForOpponent(id, mineSnapshot){
+    const c = document.getElementById('battleContent');
+    c.innerHTML = `<p style="text-align:center;">Esperando que alguien acepte tu reto...</p>
+      <div class="battlelog">Tu reto: <b>${mineSnapshot.name}</b> (${mineSnapshot.species})</div>
+      <div class="modal-actions"><button id="cancelChallenge">Cancelar</button></div>`;
+    document.getElementById('cancelChallenge').onclick = async ()=>{
+      stopBattlePoll();
+      let list = await getOpenList();
+      list = list.filter(x=>x.id!==id);
+      await setOpenList(list);
+      renderOnlineHome();
+    };
+    battleTimer = setInterval(async ()=>{
+      try{
+        const res = await CloudAdapter.get(battleKey(id), true);
+        if(res && res.value){
+          stopBattlePoll();
+          enterOnlineBattle(id, 'p1');
+        }
+      }catch(e){}
+    }, 2500);
+  }
+
+  async function loadOpenChallenges(){
+    const list = await getOpenList();
+    const now = Date.now();
+    const fresh = list.filter(c=>now-c.ts<10*60*1000);
+    const box = document.getElementById('challengeList');
+    if(!box) return;
+    if(fresh.length===0){ box.innerHTML = '<p class="small-note">No hay retos abiertos ahora mismo. ¡Crea uno!</p>'; return; }
+    box.innerHTML = fresh.map(ch => `<div class="challenge-item"><span>${ch.name} <small style="color:var(--muted)">(${ch.species})</small></span><button data-accept="${ch.id}">Aceptar</button></div>`).join('');
+    box.querySelectorAll('[data-accept]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = btn.getAttribute('data-accept');
+        let openList = await getOpenList();
+        const challenge = openList.find(x=>x.id===id);
+        if(!challenge){ showToast('Ese reto ya no está disponible'); loadOpenChallenges(); return; }
+        openList = openList.filter(x=>x.id!==id);
+        await setOpenList(openList);
+        const doc = {
+          id, round:1, resolvedRound:0, finished:false, winner:null, log:[],
+          p1:{ name:challenge.name, species:challenge.species, power:challenge.power, path:challenge.path, hp:100, move:null },
+          p2:{ name:mySnapshot().name, species:mySnapshot().species, power:mySnapshot().power, path:mySnapshot().path, hp:100, move:null }
+        };
+        await CloudAdapter.set(battleKey(id), JSON.stringify(doc), true);
+        enterOnlineBattle(id, 'p2');
+      };
+    });
+  }
+
+  function enterOnlineBattle(id, mySlot){
+    async function poll(){
+      let doc;
+      try{
+        const res = await CloudAdapter.get(battleKey(id), true);
+        if(!res || !res.value) return;
+        doc = JSON.parse(res.value);
+      }catch(e){ return; }
+
+      if(!doc.finished && doc.p1.move && doc.p2.move && doc.resolvedRound < doc.round){
+        const r = resolveMoves(doc.p1.move, doc.p2.move, doc.p1.power, doc.p2.power, doc.p1.path, doc.p2.path);
+        doc.p1.hp = Math.min(100, Math.max(0, doc.p1.hp - r.dmgToA + r.healA));
+        doc.p2.hp = Math.min(100, Math.max(0, doc.p2.hp - r.dmgToB + r.healB));
+        doc.log.push(doc.p1.name+' usó '+doc.p1.move+' · '+doc.p2.name+' usó '+doc.p2.move+' — '+r.text);
+        doc.p1.move=null; doc.p2.move=null;
+        doc.resolvedRound = doc.round;
+        doc.round += 1;
+        if(doc.p1.hp<=0 || doc.p2.hp<=0){
+          doc.finished=true;
+          doc.winner = doc.p1.hp<=0? doc.p2.name : doc.p1.name;
+          const winnerSpecies = doc.p1.hp<=0 ? doc.p2.species : doc.p1.species;
+          recordWin(doc.winner, winnerSpecies);
+        }
+        try{ await CloudAdapter.set(battleKey(id), JSON.stringify(doc), true); }catch(e){}
+      }
+      renderOnlineBattleUI(doc, mySlot, id);
+    }
+    poll();
+    battleTimer = setInterval(poll, 2000);
+  }
+
+  function renderOnlineBattleUI(doc, mySlot, id){
+    const c = document.getElementById('battleContent');
+    const me = doc[mySlot];
+    const opp = doc[mySlot==='p1'?'p2':'p1'];
+    const myMoveSet = !!me.move;
+    c.innerHTML = `
+      <div class="vs">
+        <div class="fighter"><b>${doc.p1.name}</b><small>${doc.p1.species}</small><div class="hpbar"><div class="hpfill" style="width:${Math.max(0,doc.p1.hp)}%"></div></div></div>
+        <div class="vslabel">VS</div>
+        <div class="fighter"><b>${doc.p2.name}</b><small>${doc.p2.species}</small><div class="hpbar"><div class="hpfill" style="width:${Math.max(0,doc.p2.hp)}%"></div></div></div>
+      </div>
+      ${doc.finished ? `<p style="text-align:center;font-weight:800;">${doc.winner} gana la batalla 🏆</p>
+        <div class="modal-actions"><button id="backOnline">Volver a la arena</button></div>`
+      : myMoveSet ? `<p class="small-note" style="text-align:center;">Esperando el movimiento de ${opp.name}...</p>`
+      : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
+        <div class="movegrid">
+          <button data-mv="Ataque">⚔️<br>Ataque</button>
+          <button data-mv="Especial">✨<br>Especial</button>
+          <button data-mv="Defensa">🛡️<br>Defensa</button>
+        </div>`}
+      <div class="battlelog">${(doc.log||[]).slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
+    `;
+    if(!doc.finished && !myMoveSet){
+      c.querySelectorAll('[data-mv]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          try{
+            const res = await CloudAdapter.get(battleKey(id), true);
+            const fresh = JSON.parse(res.value);
+            fresh[mySlot].move = btn.getAttribute('data-mv');
+            await CloudAdapter.set(battleKey(id), JSON.stringify(fresh), true);
+            renderOnlineBattleUI(fresh, mySlot, id);
+          }catch(e){}
+        };
+      });
+    }
+    if(doc.finished){
+      stopBattlePoll();
+      const backBtn = document.getElementById('backOnline');
+      if(backBtn) backBtn.onclick = ()=>renderOnlineHome();
+    }
+  }
+
+  document.getElementById('btnBattle').onclick = openBattleModal;
+
+  loadPet().then(()=>{
+    setInterval(()=>tick(true), TICK_MS);
+    setInterval(()=>{ if(pet.alive && pet.stage>0){ render(); } }, 550); // idle animation refresh
+  });
+})();
+</script>
+</body>
+</html>
+<!--
+==================================================================================
+Mis notas para cuando lo suba a mi hosting (esto ya lo hice, lo dejo por si
+tengo que repetirlo alguna vez o rehacer el proyecto de Firebase)
+==================================================================================
+1) Proyecto gratis en https://console.firebase.google.com (lo llamé "vpet")
+2) Authentication → Sign-in method → activar Anónimo
+3) Firestore en modo producción, con mis reglas (usuarios solo ven lo suyo,
+   lo compartido lo puede leer/escribir cualquiera con sesión anónima)
+4) El firebaseConfig ya está puesto arriba, en la constante FIREBASE_CONFIG
+5) Lo subí a GitHub Pages, renombrando el archivo a index.html
+==================================================================================
+-->
