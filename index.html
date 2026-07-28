@@ -12,9 +12,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
-    --shell:#1b1f2a;
-    --shell-hi:#262c3d;
-    --shell-lo:#12151d;
+    --shell:#1c1c1e;
+    --shell-hi:#2c2c30;
+    --shell-lo:#0a0a0b;
     --screen:#0a1712;
     --ink:#eaf2ee;
     --muted:#8592a0;
@@ -23,6 +23,9 @@
     --equilibrio:#ffb84d;
     --accent:#8fe3a0;
     --danger:#ff5c5c;
+    --devred:#d81c2b;
+    --devred-dk:#7a0f18;
+    --devred-lt:#f04552;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
@@ -32,16 +35,31 @@
   }
   .device{
     width:100%;max-width:380px;background:linear-gradient(160deg,var(--shell-hi),var(--shell) 40%,var(--shell-lo));
-    border-radius:32px;padding:18px 18px 22px;box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
-    border:1px solid #000;
+    border-radius:26px;padding:18px 18px 22px;box-shadow:0 20px 50px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
+    border:1px solid #000;position:relative;
+  }
+  .device-top{display:flex;justify-content:space-between;align-items:center;padding:0 10px 10px;}
+  .device-top .knob{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a3a3e,#0a0a0b);box-shadow:inset 0 0 0 1px #000;}
+  .device-top .slider{width:26px;height:8px;border-radius:4px;background:linear-gradient(90deg,#0a0a0b,#2c2c30);box-shadow:inset 0 0 0 1px #000;}
+  .keyring{
+    position:absolute;top:-11px;right:26px;width:20px;height:20px;border-radius:50%;
+    border:3px solid #9aa0a6;box-shadow:0 1px 2px rgba(0,0,0,.5);background:transparent;
   }
   .topbar{display:flex;justify-content:space-between;align-items:center;padding:2px 6px 14px;}
   .brand{font-family:'Press Start 2P',monospace;font-size:11px;letter-spacing:1px;color:var(--accent2,var(--ink));}
   .brand span{color:var(--luz);}
   .agebadge{font-size:11px;color:var(--muted);font-weight:700;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .mutebtn{font-size:15px;cursor:pointer;user-select:none;line-height:1;}
   .screen-bezel{
-    position:relative;background:#000;border-radius:18px;padding:10px;
-    box-shadow:inset 0 0 0 3px #05070a, inset 0 0 30px rgba(0,0,0,.8);
+    position:relative;border-radius:16px;padding:15px;
+    background:
+      radial-gradient(circle 4px at 15px 15px, #1a1a1a 95%, transparent 97%),
+      radial-gradient(circle 4px at calc(100% - 15px) 15px, #1a1a1a 95%, transparent 97%),
+      radial-gradient(circle 4px at 15px calc(100% - 15px), #1a1a1a 95%, transparent 97%),
+      radial-gradient(circle 4px at calc(100% - 15px) calc(100% - 15px), #1a1a1a 95%, transparent 97%),
+      linear-gradient(160deg,var(--devred-lt),var(--devred) 45%,var(--devred-dk));
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.4);
   }
   .screen-inner{position:relative;border-radius:10px;overflow:hidden;background:var(--screen);}
   canvas#screen{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;}
@@ -70,17 +88,25 @@
   .fill-energy{background:linear-gradient(90deg,#5ec8ff,#a7e6ff);}
   .fill-health{background:linear-gradient(90deg,#5eff9e,#baffcf);}
   .fill-hyg{background:linear-gradient(90deg,#c9a0ff,#e6d3ff);}
-  .controls{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  .effects-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;min-height:0;}
+  .effect-chip{font-size:10px;font-weight:800;padding:4px 9px;border-radius:8px;}
+  .effect-empacho{background:rgba(255,184,77,.15);color:#ffb84d;border:1px solid rgba(255,184,77,.4);}
+  .effect-letargo{background:rgba(255,92,92,.15);color:#ff5c5c;border:1px solid rgba(255,92,92,.4);}
+  .effect-racha{background:rgba(94,255,158,.15);color:#5eff9e;border:1px solid rgba(94,255,158,.4);}
+  .controls{margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
   button{
-    font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;color:var(--ink);
-    background:linear-gradient(160deg,#333a4d,#20242f);border:1px solid #000;
-    border-radius:12px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;
-    box-shadow:0 3px 0 #05060a, inset 0 1px 0 rgba(255,255,255,.08);
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:7.5px;letter-spacing:.2px;color:#fff;
+    background:linear-gradient(160deg,var(--devred-lt),var(--devred-dk));border:2px solid #4a0810;
+    border-radius:50%;aspect-ratio:1/1;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    box-shadow:0 4px 0 #4a0810, inset 0 1px 0 rgba(255,255,255,.3);
   }
-  button:active{transform:translateY(2px);box-shadow:0 1px 0 #05060a;}
+  button:active{transform:translateY(3px);box-shadow:0 1px 0 #4a0810;}
   button:disabled{opacity:.35;filter:grayscale(.6);}
   button .ico{font-size:19px;}
-  .status-btn{grid-column:span 3;background:linear-gradient(160deg,#3a4256,#20242f);}
+  .status-btn{
+    grid-column:span 3;aspect-ratio:auto;border-radius:24px;flex-direction:row;gap:8px;padding:11px;font-size:12px;
+  }
+  .status-btn .ico{font-size:16px;}
   .toast{
     position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
     background:#0d0f16;border:1px solid #333;color:var(--ink);padding:9px 16px;border-radius:10px;
@@ -126,13 +152,33 @@
     border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
   .challenge-item button{padding:6px 12px;}
   .small-note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
+  .game-hud{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:8px;}
+  .game-area{position:relative;height:210px;background:#0a1712;border-radius:10px;overflow:hidden;margin-top:8px;border:1px solid #000;}
+  .game-item{position:absolute;font-size:22px;transform:translate(-50%,-50%);pointer-events:none;}
+  .game-basket{position:absolute;bottom:6px;width:15%;height:20px;background:var(--devred);border-radius:6px;transform:translateX(-50%);box-shadow:0 0 0 2px #000;}
+  .game-zone{position:absolute;top:0;bottom:0;width:50%;}
+  .memgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;}
+  .memcard{aspect-ratio:1/1;font-size:20px;border-radius:8px;background:linear-gradient(160deg,#333a4d,#20242f);border:1px solid #000;color:#fff;}
+  .memcard.matched{opacity:.5;}
+  .simon-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
+  .simon-btn{aspect-ratio:1/1;border-radius:14px;opacity:.5;transition:opacity .15s, transform .1s;border:2px solid #000;box-shadow:none;}
+  .simon-btn.lit{opacity:1;transform:scale(1.05);}
+  .simon-red{background:#ff4d4d;} .simon-green{background:#4dff88;} .simon-blue{background:#4d9dff;} .simon-yellow{background:#ffe14d;}
 </style>
 </head>
 <body>
 <div class="device">
+  <div class="keyring"></div>
+  <div class="device-top">
+    <span class="knob"></span>
+    <span class="slider"></span>
+  </div>
   <div class="topbar">
     <div class="brand">BYTE<span>MON</span></div>
-    <div class="agebadge" id="ageBadge">Edad: 0h</div>
+    <div class="topbar-right">
+      <span id="btnMute" class="mutebtn" role="button" aria-label="Silenciar sonido" tabindex="0">🔊</span>
+      <div class="agebadge" id="ageBadge">Edad: 0h</div>
+    </div>
   </div>
 
   <div class="screen-bezel">
@@ -155,6 +201,7 @@
     <div class="stat-row"><span class="stat-icon">✚</span><div class="bar-track"><div class="bar-fill fill-health" id="barHealth"></div></div></div>
     <div class="stat-row"><span class="stat-icon">✨</span><div class="bar-track"><div class="bar-fill fill-hyg" id="barHyg"></div></div></div>
   </div>
+  <div class="effects-row" id="effectsRow"></div>
 
   <div class="controls">
     <button id="btnFeed"><span class="ico">🍖</span>Alimentar</button>
@@ -164,6 +211,7 @@
     <button id="btnMed" disabled><span class="ico">💊</span>Medicina</button>
     <button id="btnInfo"><span class="ico">📋</span>Estado</button>
     <button id="btnBattle" class="status-btn"><span class="ico">⚔️</span>Batalla</button>
+    <button id="btnGames" class="status-btn"><span class="ico">🎲</span>Minijuegos</button>
   </div>
 
   <div class="footnote">Cada usuario que abra este VPET tiene su propia mascota guardada — es personal e independiente.</div>
@@ -258,14 +306,82 @@
   ctx.imageSmoothingEnabled = false;
   const cell = canvas.width / GRID;
 
+  // ---------- mis sonidos, los genero yo mismo con osciladores (nada de archivos de audio) ----------
+  let audioCtx = null;
+  let soundOn = true;
+  function ensureAudio(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ audioCtx = null; }
+    }
+    if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume(); }
+  }
+  function beep(freq, duration, type, delay, peakGain){
+    if(!audioCtx) return;
+    const t0 = audioCtx.currentTime + (delay||0);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'square';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(peakGain!==undefined?peakGain:0.15, t0+0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0+duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0+duration+0.03);
+  }
+  function sfx(name){
+    if(!soundOn) return;
+    ensureAudio();
+    if(!audioCtx) return;
+    switch(name){
+      case 'tap':     beep(700,0.05,'square',0,0.07); break;
+      case 'feed':    beep(520,0.09,'square',0); beep(760,0.09,'square',0.08); break;
+      case 'play':    beep(600,0.07,'square',0); beep(760,0.07,'square',0.08); beep(940,0.09,'square',0.16); break;
+      case 'clean':   beep(300,0.12,'sawtooth',0,0.08); beep(520,0.1,'sawtooth',0.08,0.08); break;
+      case 'sleep':   beep(520,0.12,'sine',0,0.08); beep(360,0.18,'sine',0.1,0.08); break;
+      case 'wake':    beep(360,0.1,'sine',0,0.08); beep(560,0.14,'sine',0.09,0.08); break;
+      case 'heal':    beep(700,0.08,'triangle',0); beep(900,0.08,'triangle',0.08); beep(1100,0.12,'triangle',0.16); break;
+      case 'hatch':   beep(500,0.1,'square',0); beep(700,0.1,'square',0.1); beep(950,0.18,'square',0.2); break;
+      case 'evolve':  beep(400,0.1,'square',0); beep(600,0.1,'square',0.1); beep(800,0.1,'square',0.2); beep(1050,0.22,'square',0.3); break;
+      case 'mistake': beep(220,0.16,'sawtooth',0,0.09); break;
+      case 'hit':     beep(150,0.1,'square',0,0.12); break;
+      case 'win':     beep(600,0.1,'square',0); beep(800,0.1,'square',0.1); beep(1000,0.1,'square',0.2); beep(1300,0.22,'square',0.3); break;
+      case 'lose':    beep(500,0.15,'sawtooth',0); beep(380,0.15,'sawtooth',0.15); beep(260,0.28,'sawtooth',0.3); break;
+      case 'death':   beep(300,0.2,'sawtooth',0); beep(200,0.2,'sawtooth',0.2); beep(120,0.38,'sawtooth',0.4); break;
+    }
+  }
+
   const STAGE_NAMES = ['HUEVO','CRÍA','PEQUEÑO','JOVEN','PERFECTO','SUPREMO'];
   const PATH_LABEL = {luz:'SENDA: LUZ', sombra:'SENDA: SOMBRA', equilibrio:'SENDA: EQUILIBRIO'};
   const PATH_COLOR = {luz:'#5eff9e', sombra:'#ff4d8d', equilibrio:'#ffb84d'};
-  const SPECIES = {
-    luz:      { Activo:'Ventair',  Tranquilo:'Serenya' },
-    sombra:   { Activo:'Fangrax',  Tranquilo:'Umbrisk' },
-    equilibrio:{ Activo:'Tazuma',  Tranquilo:'Calmite' }
+  // ---------- generador de especies (mi PRNG con semilla, para que cada mascota sea consistente) ----------
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const SYLLABLES = {
+    luz:        ['Ae','Vel','Ser','Lir','Or','Wyn','Ith','Cel','Ael','Nyra','Sol','Ily'],
+    sombra:     ['Fang','Grim','Vex','Drak','Nox','Krev','Zhul','Morg','Ash','Rax','Vor','Sker'],
+    equilibrio: ['Tan','Kai','Doro','Bal','Sen','Mira','Tazu','Ren','Vio','Tol','Nim','Quor']
   };
+  function proceduralName(path, temperament, seed){
+    const rand = mulberry32(seed);
+    const pool = SYLLABLES[path];
+    const preferLong = temperament==='Tranquilo';
+    const count = rand() < (preferLong ? 0.4 : 0.7) ? 2 : 3;
+    let parts=[], last=null;
+    for(let i=0;i<count;i++){
+      let s;
+      do{ s = pool[Math.floor(rand()*pool.length)]; } while(s===last && pool.length>1);
+      parts.push(s.toLowerCase());
+      last = s;
+    }
+    let name = parts.join('');
+    return name.charAt(0).toUpperCase()+name.slice(1);
+  }
   function speciesDisplay(pet){
     if(!pet.speciesName) return STAGE_NAMES[pet.stage];
     if(pet.stage===4) return pet.speciesName+' Mayor';
@@ -274,10 +390,10 @@
   }
 
   const AGE_HATCH = 3;
-  const AGE_CHILD = 15;
-  const AGE_ADULT = 40;
-  const AGE_PERFECT = 90;
-  const AGE_ULTIMATE = 160;
+  const LEVEL_CHILD = 3;
+  const LEVEL_ADULT = 8;
+  const LEVEL_PERFECT = 15;
+  const LEVEL_ULTIMATE = 25;
   const TICK_MS = 4000;
   const SICK_DEATH_TICKS = 14;
 
@@ -290,6 +406,9 @@
       sumHappy:0, sumSac:0, sumHyg:0, ticks:0,
       lastMistakeFlags:{sac:false,happy:false,hyg:false},
       temperament:null, feedCount:0, playCount:0, speciesName:null,
+      empachoTicks:0, activeEffects:[],
+      speciesSeed:null, hue:0, bodyShape:'redondo', featureType:'alas', eyeStyle:'redondos', pattern:'liso',
+      level:1, xp:0, xpNext:10, stats:{atq:5, def:5, mag:5, res:5, vel:5}, affinity:null,
       lastSaved: Date.now(), frame:0
     };
   }
@@ -340,21 +459,79 @@
     return 'equilibrio';
   }
 
+  function weightedPick(rand, options, weights){
+    const total = weights.reduce((a,b)=>a+b,0);
+    let r = rand()*total;
+    for(let i=0;i<options.length;i++){
+      r -= weights[i];
+      if(r<=0) return options[i];
+    }
+    return options[options.length-1];
+  }
+
   function checkEvolution(){
-    if(pet.stage===0 && pet.age>=AGE_HATCH){ pet.stage=1; showToast('¡El huevo ha eclosionado!'); }
-    else if(pet.stage===1 && pet.age>=AGE_CHILD){
+    if(pet.stage===0 && pet.age>=AGE_HATCH){ pet.stage=1; showToast('¡El huevo ha eclosionado!'); sfx('hatch'); }
+    else if(pet.stage===1 && pet.level>=LEVEL_CHILD){
       pet.temperament = pet.playCount > pet.feedCount ? 'Activo' : 'Tranquilo';
       pet.stage=2;
       showToast(pet.name+' ha crecido — temperamento '+pet.temperament);
+      sfx('evolve');
     }
-    else if(pet.stage===2 && pet.age>=AGE_ADULT){
+    else if(pet.stage===2 && pet.level>=LEVEL_ADULT){
       pet.path = computePath();
-      pet.speciesName = SPECIES[pet.path][pet.temperament||'Tranquilo'];
+      pet.affinity = computeAffinity();
+      pet.speciesSeed = Math.floor(Math.random()*4294967295);
+      pet.speciesName = proceduralName(pet.path, pet.temperament, pet.speciesSeed);
+      const rand2 = mulberry32(pet.speciesSeed+1);
+      pet.hue = Math.floor(rand2()*360);
+
+      const shapeOpts = ['redondo','anguloso','alargado','compacto'];
+      const featOpts = ['alas','cuernos','orejas','aletas','antenas','pinchos'];
+      const AFFINITY_WEIGHTS = {
+        atq:        { shape:[1,2.2,0.6,1.6], feat:[0.5,2.2,0.8,1,0.5,2] },
+        def:        { shape:[1.4,0.8,0.5,2.2], feat:[0.5,1,2,2,0.5,1.4] },
+        mag:        { shape:[1.6,0.5,2,0.6], feat:[2.2,0.5,0.8,0.6,2.2,0.5] },
+        res:        { shape:[2,0.6,0.8,1.4], feat:[1.4,0.6,2.2,1,1,0.6] },
+        vel:        { shape:[1,0.6,2.2,0.8], feat:[2,0.5,0.6,1.4,2,0.5] },
+        equilibrado:{ shape:[1,1,1,1], feat:[1,1,1,1,1,1] }
+      };
+      const w = AFFINITY_WEIGHTS[pet.affinity] || AFFINITY_WEIGHTS.equilibrado;
+      pet.bodyShape = weightedPick(rand2, shapeOpts, w.shape);
+      pet.featureType = weightedPick(rand2, featOpts, w.feat);
+      pet.eyeStyle = ['redondos','rasgados','ciclope','trio'][Math.floor(rand2()*4)];
+      pet.pattern = ['liso','manchas','rayas','estrellado'][Math.floor(rand2()*4)];
       pet.stage=3;
       showToast(pet.name+' ha digievolucionado en '+pet.speciesName+' — '+PATH_LABEL[pet.path]);
+      sfx('evolve');
     }
-    else if(pet.stage===3 && pet.age>=AGE_PERFECT){ pet.stage=4; showToast(pet.name+' alcanzó su forma Perfecta.'); }
-    else if(pet.stage===4 && pet.age>=AGE_ULTIMATE){ pet.stage=5; showToast(pet.name+' alcanzó su forma Suprema.'); }
+    else if(pet.stage===3 && pet.level>=LEVEL_PERFECT){ pet.stage=4; showToast(pet.name+' alcanzó su forma Perfecta.'); sfx('evolve'); }
+    else if(pet.stage===4 && pet.level>=LEVEL_ULTIMATE){ pet.stage=5; showToast(pet.name+' alcanzó su forma Suprema.'); sfx('evolve'); }
+  }
+
+  const STAT_KEYS = ['atq','def','mag','res','vel'];
+  const STAT_LABEL = {atq:'Ataque', def:'Defensa', mag:'Magia', res:'Resistencia', vel:'Velocidad'};
+  function gainXp(amount){
+    if(pet.stage===0 || !pet.alive) return;
+    pet.xp += amount;
+    while(pet.xp >= pet.xpNext){
+      pet.xp -= pet.xpNext;
+      pet.level += 1;
+      pet.xpNext = Math.round(pet.xpNext*1.35 + 5);
+      const gains = STAT_KEYS.map(k=>{
+        const up = 1+Math.floor(Math.random()*4);
+        pet.stats[k] += up;
+        return up;
+      });
+      const best = STAT_KEYS.reduce((a,b,i)=>gains[i]>gains[STAT_KEYS.indexOf(a)]?b:a, STAT_KEYS[0]);
+      showToast('¡'+pet.name+' subió a nivel '+pet.level+'! ('+STAT_LABEL[best]+' +'+gains[STAT_KEYS.indexOf(best)]+')');
+    }
+  }
+  function computeAffinity(){
+    const s = pet.stats;
+    let best = STAT_KEYS[0];
+    STAT_KEYS.forEach(k=>{ if(s[k]>s[best]) best=k; });
+    const tiedTop = STAT_KEYS.filter(k=>s[k]===s[best]);
+    return tiedTop.length>1 ? 'equilibrado' : best;
   }
 
   function tick(doRender){
@@ -370,25 +547,42 @@
         pet.energy = clamp(pet.energy + 6);
         pet.sac = clamp(pet.sac - 1);
         pet.happy = clamp(pet.happy - 1);
+        pet.activeEffects = [];
       } else {
-        pet.sac = clamp(pet.sac - 3);
-        pet.happy = clamp(pet.happy - 2);
-        pet.energy = clamp(pet.energy - 2);
+        const isEmpacho = pet.empachoTicks>0;
+        const isLetargo = pet.energy<=5;
+        const isRacha = pet.sac>60 && pet.happy>60 && pet.hyg>60 && pet.health>=80;
+
+        // el hambre y el ánimo casi no bajan: solo se mueven de verdad cada 3 turnos
+        if(pet.ticks % 3 === 0 || isLetargo){
+          const sacDecay = 1 + (isLetargo?2:0);
+          const happyDecay = 1 + (isEmpacho?2:0) + (isLetargo?1:0) - (isRacha?3:0);
+          pet.sac = clamp(pet.sac - sacDecay);
+          pet.happy = clamp(pet.happy - happyDecay);
+        }
+        if(pet.ticks % 2 === 0){ pet.energy = clamp(pet.energy - 1); }
+        if(isRacha){ pet.health = clamp(pet.health + 2); }
+        if(pet.empachoTicks>0){ pet.empachoTicks--; }
+
+        pet.activeEffects = [];
+        if(isEmpacho) pet.activeEffects.push('empacho');
+        if(isLetargo) pet.activeEffects.push('letargo');
+        if(isRacha) pet.activeEffects.push('racha');
       }
 
       if(pet.poopTimer>0){
         pet.poopTimer -= 1;
         if(pet.poopTimer===0 && pet.poops<4){ pet.poops += 1; }
       }
-      pet.hyg = clamp(100 - pet.poops*22);
+      pet.hyg = clamp(100 - pet.poops*14);
 
       // aquí cuento los fallos de cuidado, solo una vez cada vez que la barra toca fondo
       const flags = pet.lastMistakeFlags;
-      if(pet.sac<=0 && !flags.sac){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.sac=true; }
+      if(pet.sac<=0 && !flags.sac){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.sac=true; sfx('mistake'); }
       if(pet.sac>10) flags.sac=false;
-      if(pet.happy<=0 && !flags.happy){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.happy=true; }
+      if(pet.happy<=0 && !flags.happy){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.happy=true; sfx('mistake'); }
       if(pet.happy>10) flags.happy=false;
-      if(pet.hyg<=0 && !flags.hyg){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.hyg=true; }
+      if(pet.hyg<=0 && !flags.hyg){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.hyg=true; sfx('mistake'); }
       if(pet.hyg>10) flags.hyg=false;
 
       if(pet.health<=0 && !pet.sick){ pet.sick=true; pet.sickTicks=0; }
@@ -396,10 +590,11 @@
         pet.sickTicks++;
         if(pet.sickTicks>=SICK_DEATH_TICKS){
           pet.alive=false;
+          sfx('death');
         }
       }
-      checkEvolution();
     }
+    checkEvolution();
 
     if(doRender!==false){ render(); savePet(); }
   }
@@ -421,11 +616,15 @@
     return out;
   }
 
-  function palette(stage, path){
+  function palette(stage, hue){
     if(stage<=2){ return {body:'#8fe3a0', belly:'#eafff0', dark:'#4fae6c', accent:'#c8ffd6'}; }
-    if(path==='luz') return {body:'#4fd6ff', belly:'#dffaff', dark:'#1e9fd6', accent:'#5eff9e'};
-    if(path==='sombra') return {body:'#8a4fe0', belly:'#e3d1ff', dark:'#5a2ba8', accent:'#ff4d8d'};
-    return {body:'#ffb84d', belly:'#fff1d6', dark:'#d68f1e', accent:'#ffe08a'};
+    const h = hue||0;
+    return {
+      body:  `hsl(${h}, 68%, 62%)`,
+      belly: `hsl(${h}, 55%, 87%)`,
+      dark:  `hsl(${h}, 60%, 30%)`,
+      accent:`hsl(${(h+35)%360}, 75%, 65%)`
+    };
   }
 
   function drawEgg(frame){
@@ -445,37 +644,48 @@
     ctx.beginPath(); ctx.ellipse(cx*cell, (cy+7)*cell, 5*cell,1.1*cell,0,0,Math.PI*2); ctx.fill();
   }
 
-  function drawCreature(stage, path, frame, sick, sleeping, temperament){
+  function drawCreature(pet){
+    const {stage, frame, sick, sleeping, temperament} = pet;
     ctx.fillStyle='#0a1712'; ctx.fillRect(0,0,canvas.width,canvas.height);
     const cx=12, cy=13.5;
     const sizes = {1:[4.6,4.2],2:[5.6,5.0],3:[6.8,6.2],4:[7.8,7.2],5:[8.8,8.2]};
-    const [rx,ry] = sizes[stage];
-    const pal = palette(stage, path);
+    let [rx,ry] = sizes[stage];
+    if(stage>=3){
+      const shape = pet.bodyShape||'redondo';
+      if(shape==='anguloso'){ rx*=0.92; ry*=1.08; }
+      else if(shape==='alargado'){ rx*=0.8; ry*=1.28; }
+      else if(shape==='compacto'){ rx*=1.18; ry*=0.82; }
+    }
+    const pal = palette(stage, pet.hue);
     const bob = (frame%8<4)?0:0.4;
     const bcy = cy+bob;
 
-    if(sick){ ctx.filter='saturate(0.35) brightness(0.85)'; }
+    ctx.filter = sick? 'saturate(0.35) brightness(0.85)' : 'none';
 
     // otra vez la sombrita del suelo, pero pegada al bicho ya crecido
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(cx*cell, (cy+ry+2)*cell, (rx*0.9)*cell,1.1*cell,0,0,Math.PI*2); ctx.fill();
 
-    // esto va detrás del cuerpo: alas, cuernos u orejas según la senda
+    // esto va detrás del cuerpo: el rasgo que le tocó a esta especie, no depende de la senda
     if(stage>=3){
       const featScale = stage===3?1:(stage===4?1.35:1.7);
-      if(path==='luz'){
-        drawWings(cx,bcy,rx,ry,featScale,pal.accent);
-      } else if(path==='sombra'){
-        drawHorns(cx,bcy,rx,ry,featScale,pal.accent);
-      } else {
-        drawEars(cx,bcy,rx,ry,featScale,pal.accent);
-      }
+      const feat = pet.featureType||'alas';
+      if(feat==='alas') drawWings(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='cuernos') drawHorns(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='orejas') drawEars(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='aletas') drawFins(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='antenas') drawAntennas(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='pinchos') drawSpikes(cx,bcy,rx,ry,featScale,pal.accent);
     }
 
     // el cuerpo
     ellipseCells(cx,bcy,rx,ry).forEach(([gx,gy])=>px(gx,gy,pal.body));
     // la barriguita más clara
     ellipseCells(cx,bcy+ry*0.28,rx*0.62,ry*0.5).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    // el patrón propio de esta especie (liso, manchas, rayas o estrellado), desde Joven en adelante
+    if(stage>=3 && pet.pattern && pet.pattern!=='liso'){
+      drawPattern(cx,bcy,rx,ry,pet.pattern,pal.dark);
+    }
 
     // patitas cortas, desde que es Pequeño en adelante
     if(stage>=2 && stage<=2){
@@ -496,12 +706,13 @@
       px(cx-0.7,bcy-ry-2,pal.accent,1.4,0.9);
     }
 
-    // los ojos
+    // los ojos, con el estilo propio de esta especie
+    const eyeStyle = stage>=3 ? (pet.eyeStyle||'redondos') : 'redondos';
     const eyeY = bcy - ry*0.12;
-    const eyeDX = rx*0.42;
+    const eyeDX = eyeStyle==='ciclope' ? 0 : rx*0.42;
     if(sleeping){
-      px(cx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5);
-      px(cx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5);
+      if(eyeStyle==='ciclope'){ px(cx-0.8,eyeY,'#1a2620',1.6,0.5); }
+      else{ px(cx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); px(cx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); }
       ctx.fillStyle='#dfeee6';
       ctx.font='700 22px monospace';
       ctx.fillText('Z', (cx+rx+1)*cell, (bcy-ry-2+((frame%16<8)?0:-1))*cell);
@@ -514,8 +725,19 @@
     } else {
       const blink = frame%20>=18;
       const eh = blink?0.4:1.5;
-      px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-      px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+      if(eyeStyle==='ciclope'){
+        px(cx-1.1,eyeY+(2.2-eh)/2,'#1a2620',2.2,eh+0.7);
+      } else if(eyeStyle==='rasgados'){
+        px(cx-eyeDX-0.4,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
+        px(cx+eyeDX-0.8,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
+      } else if(eyeStyle==='trio'){
+        px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
+        px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
+        px(cx-0.5,eyeY+ry*0.35,'#1a2620',1.0,eh*0.7);
+      } else {
+        px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+        px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+      }
     }
 
     // la boquita
@@ -555,12 +777,45 @@
     ellipseCells(cx-rx*0.65,cy-ry*0.85,r*0.6,r).forEach(([gx,gy])=>px(gx,gy,color));
     ellipseCells(cx+rx*0.65,cy-ry*0.85,r*0.6,r).forEach(([gx,gy])=>px(gx,gy,color));
   }
+  function drawFins(cx,cy,rx,ry,scale,color){
+    const w=1.3*scale, h=2.2*scale;
+    px(cx-rx-w*0.7, cy+ry*0.1, color, w, h*0.5);
+    px(cx-rx-w*0.3, cy+ry*0.5, color, w*0.6, h*0.4);
+    px(cx+rx-w*0.3, cy+ry*0.1, color, w, h*0.5);
+    px(cx+rx-w*0.3+w*0.3, cy+ry*0.5, color, w*0.6, h*0.4);
+    px(cx-0.6, cy-ry-h*0.6, color, 1.2, h*0.7);
+  }
+  function drawAntennas(cx,cy,rx,ry,scale,color){
+    const h=2.8*scale;
+    px(cx-rx*0.4-0.2, cy-ry-h, color, 0.5, h);
+    px(cx-rx*0.4-0.6, cy-ry-h-0.7, color, 1.2, 1.2);
+    px(cx+rx*0.4-0.3, cy-ry-h*0.8, color, 0.5, h*0.8);
+    px(cx+rx*0.4-0.7, cy-ry-h*0.8-0.7, color, 1.2, 1.2);
+  }
+  function drawSpikes(cx,cy,rx,ry,scale,color){
+    const n=3, s=1.3*scale;
+    for(let i=0;i<n;i++){
+      const gx = cx - rx*0.5 + i*(rx*0.5);
+      px(gx, cy-ry-s*(1-i*0.15), color, s*0.7, s*(1+i*0.15));
+    }
+  }
+  function drawPattern(cx,cy,rx,ry,pattern,color){
+    if(pattern==='manchas'){
+      const spots=[[cx-rx*0.35,cy-ry*0.15],[cx+rx*0.3,cy-ry*0.3],[cx-rx*0.1,cy+ry*0.3],[cx+rx*0.35,cy+ry*0.05]];
+      spots.forEach(([gx,gy])=>px(gx,gy,color,1,1));
+    } else if(pattern==='rayas'){
+      for(let i=-1;i<=1;i++){ px(cx+i*rx*0.4-0.25, cy-ry*0.55, color, 0.5, ry*1.05); }
+    } else if(pattern==='estrellado'){
+      const flecks=[[cx-rx*0.5,cy-ry*0.4],[cx+rx*0.2,cy-ry*0.55],[cx-rx*0.2,cy+ry*0.1],[cx+rx*0.45,cy+ry*0.25],[cx-rx*0.05,cy-ry*0.05],[cx+rx*0.05,cy+ry*0.45]];
+      flecks.forEach(([gx,gy])=>px(gx,gy,color,0.5,0.5));
+    }
+  }
 
   function render(){
     if(!hasLoaded) return;
     document.getElementById('hudName').textContent = pet.name.toUpperCase();
     document.getElementById('hudStage').textContent = speciesDisplay(pet);
-    document.getElementById('ageBadge').textContent = 'Edad: '+pet.age+'h';
+    document.getElementById('ageBadge').textContent = 'Edad: '+pet.age+'h · Nv.'+pet.level;
     const tag = document.getElementById('pathTag');
     if(pet.path){ tag.textContent = PATH_LABEL[pet.path]; tag.style.setProperty('--tagcolor', PATH_COLOR[pet.path]); document.getElementById('glowring').style.setProperty('--glow', PATH_COLOR[pet.path]+'55'); }
     else { tag.textContent=''; document.getElementById('glowring').style.setProperty('--glow','transparent'); }
@@ -570,6 +825,10 @@
     document.getElementById('barEnergy').style.width = pet.energy+'%';
     document.getElementById('barHealth').style.width = pet.health+'%';
     document.getElementById('barHyg').style.width = pet.hyg+'%';
+
+    const EFFECT_LABEL = {empacho:'🤢 Empacho', letargo:'😩 Letargo', racha:'🌟 Racha de bienestar'};
+    document.getElementById('effectsRow').innerHTML = (pet.activeEffects||[]).map(e=>
+      `<span class="effect-chip effect-${e}">${EFFECT_LABEL[e]}</span>`).join('');
 
     document.getElementById('btnMed').disabled = !pet.sick;
     document.getElementById('btnSleep').querySelector('.ico').textContent = pet.sleeping ? '⏰' : '😴';
@@ -582,7 +841,7 @@
 
     pet.frame = (pet.frame||0)+1;
     if(pet.stage===0) drawEgg(pet.frame);
-    else drawCreature(pet.stage, pet.path, pet.frame, pet.sick, pet.sleeping, pet.temperament);
+    else drawCreature(pet);
   }
 
   function renderGameOver(){
@@ -612,11 +871,23 @@
   // ---------- botones de acción ----------
   document.getElementById('btnFeed').onclick = ()=>{
     if(pet.stage===0 || pet.sleeping || !pet.alive) return;
+    if(pet.sac>=90){
+      pet.empachoTicks = 5;
+      if(pet.poops<4) pet.poops++;
+      pet.hyg = clamp(100 - pet.poops*14);
+      pet.feedCount++;
+      showToast(pet.name+' ya estaba lleno — le ha sentado mal, tiene empacho 🤢');
+      sfx('mistake');
+      render(); savePet();
+      return;
+    }
     pet.sac = clamp(pet.sac+28);
     pet.happy = clamp(pet.happy+4);
     pet.feedCount++;
-    if(pet.poopTimer===0 && pet.poops<4) pet.poopTimer = 3;
+    gainXp(2);
+    if(pet.poopTimer===0 && pet.poops<4) pet.poopTimer = 6;
     showToast(pet.name+' ha comido 🍖');
+    sfx('feed');
     render(); savePet();
   };
   document.getElementById('btnPlay').onclick = ()=>{
@@ -626,29 +897,37 @@
     pet.energy = clamp(pet.energy-14);
     pet.sac = clamp(pet.sac-6);
     pet.playCount++;
+    gainXp(3);
     showToast('¡'+pet.name+' se divirtió jugando! 🎮');
+    sfx('play');
     render(); savePet();
   };
   document.getElementById('btnClean').onclick = ()=>{
     if(pet.stage===0 || !pet.alive) return;
     if(pet.poops===0){ showToast('Ya está todo limpio ✨'); return; }
     pet.poops=0; pet.poopTimer=0; pet.hyg=100;
+    gainXp(1);
     showToast('Limpieza completa 🧹');
+    sfx('clean');
     render(); savePet();
   };
   document.getElementById('btnSleep').onclick = ()=>{
     if(pet.stage===0 || !pet.alive) return;
     pet.sleeping = !pet.sleeping;
     showToast(pet.sleeping ? (pet.name+' se ha dormido 😴') : (pet.name+' se ha despertado ⏰'));
+    sfx(pet.sleeping ? 'sleep' : 'wake');
     render(); savePet();
   };
   document.getElementById('btnMed').onclick = ()=>{
     if(!pet.sick || !pet.alive) return;
     pet.sick=false; pet.sickTicks=0; pet.health=clamp(pet.health+40);
+    gainXp(2);
     showToast(pet.name+' ha sido curado 💊');
+    sfx('heal');
     render(); savePet();
   };
   document.getElementById('btnInfo').onclick = ()=>{
+    sfx('tap');
     const el = document.createElement('div');
     el.className='modal-backdrop';
     el.id='infoModal';
@@ -658,6 +937,15 @@
       <div class="modal-row"><span>Etapa</span><b>${speciesDisplay(pet)}</b></div>
       <div class="modal-row"><span>Senda</span><b>${pet.path?PATH_LABEL[pet.path]:'—'}</b></div>
       <div class="modal-row"><span>Temperamento</span><b>${pet.temperament||'—'}</b></div>
+      <div class="modal-row"><span>Patrón</span><b>${pet.stage>=3?(pet.pattern.charAt(0).toUpperCase()+pet.pattern.slice(1)):'—'}</b></div>
+      <div class="modal-row"><span>Forma de cuerpo</span><b>${pet.stage>=3?(pet.bodyShape.charAt(0).toUpperCase()+pet.bodyShape.slice(1)):'—'}</b></div>
+      <div class="modal-row"><span>Rasgo</span><b>${pet.featureType?(pet.featureType.charAt(0).toUpperCase()+pet.featureType.slice(1)):'—'}</b></div>
+      <div class="modal-row"><span>Nivel</span><b>${pet.level} (${pet.xp}/${pet.xpNext} xp)</b></div>
+      <div class="modal-row"><span>ATQ / DEF</span><b>${pet.stats.atq} / ${pet.stats.def}</b></div>
+      <div class="modal-row"><span>MAG / RES</span><b>${pet.stats.mag} / ${pet.stats.res}</b></div>
+      <div class="modal-row"><span>VEL</span><b>${pet.stats.vel}</b></div>
+      <div class="modal-row"><span>Afinidad</span><b>${pet.affinity ? (STAT_LABEL[pet.affinity]||'Equilibrado') : '—'}</b></div>
+      <div class="modal-row"><span>Ojos</span><b>${pet.stage>=3?(pet.eyeStyle.charAt(0).toUpperCase()+pet.eyeStyle.slice(1)):'—'}</b></div>
       <div class="modal-row"><span>Edad</span><b>${pet.age} h virtuales</b></div>
       <div class="modal-row"><span>Fallos de cuidado</span><b>${pet.mistakes}</b></div>
       <div class="modal-row"><span>Estado</span><b>${pet.sick?'Enfermo 🤒':(pet.sleeping?'Durmiendo 😴':'Bien 🙂')}</b></div>
@@ -681,7 +969,8 @@
   const BEATS = {Ataque:'Especial', Especial:'Defensa', Defensa:'Ataque'};
 
   function powerOf(p){
-    return BASE_POWER[p.stage] + (p.path?2:0) + Math.round((p.health!==undefined?p.health:100)/100*4);
+    const statBonus = p.stats ? Math.round((p.stats.atq + p.stats.mag)/6) : 0;
+    return BASE_POWER[p.stage] + (p.path?2:0) + statBonus + Math.round((p.health!==undefined?p.health:100)/100*4);
   }
   function mySnapshot(){
     return { name:pet.name, species:speciesDisplay(pet), stage:pet.stage, path:pet.path, power:powerOf(pet) };
@@ -798,6 +1087,7 @@
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=()=>{
+          sfx('tap');
           const mv = btn.getAttribute('data-mv');
           if(s.turnOf===1){ s.p1.move=mv; s.turnOf=2; renderLocalBattle(); }
           else {
@@ -807,12 +1097,14 @@
             s.p2.hp = Math.min(100, Math.max(0, s.p2.hp - r.dmgToB + r.healB));
             s.log.push(s.p1.name+' usó '+s.p1.move+' · '+s.p2.name+' usó '+s.p2.move+' — '+r.text);
             s.p1.move=null; s.p2.move=null; s.turnOf=1;
+            sfx('hit');
+            if(s.p1.hp<=0 || s.p2.hp<=0){ sfx('win'); if(s.p2.hp<=0){ gainXp(6); savePet(); } }
             renderLocalBattle();
           }
         };
       });
     } else {
-      document.getElementById('againLocal').onclick=()=>{ renderLocalSetup(); };
+      document.getElementById('againLocal').onclick=()=>{ sfx('tap'); renderLocalSetup(); };
     }
   }
 
@@ -952,11 +1244,14 @@
         doc.p1.move=null; doc.p2.move=null;
         doc.resolvedRound = doc.round;
         doc.round += 1;
+        sfx('hit');
         if(doc.p1.hp<=0 || doc.p2.hp<=0){
           doc.finished=true;
           doc.winner = doc.p1.hp<=0? doc.p2.name : doc.p1.name;
           const winnerSpecies = doc.p1.hp<=0 ? doc.p2.species : doc.p1.species;
           recordWin(doc.winner, winnerSpecies);
+          const iWon = (mySlot==='p1' && doc.p2.hp<=0) || (mySlot==='p2' && doc.p1.hp<=0);
+          if(iWon){ gainXp(8); savePet(); }
         }
         try{ await CloudAdapter.set(battleKey(id), JSON.stringify(doc), true); }catch(e){}
       }
@@ -991,6 +1286,7 @@
     if(!doc.finished && !myMoveSet){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick = async ()=>{
+          sfx('tap');
           try{
             const res = await CloudAdapter.get(battleKey(id), true);
             const fresh = JSON.parse(res.value);
@@ -1003,12 +1299,238 @@
     }
     if(doc.finished){
       stopBattlePoll();
+      if(lastAnnouncedBattleId!==id){
+        lastAnnouncedBattleId = id;
+        sfx(doc.winner===me.name ? 'win' : 'lose');
+      }
       const backBtn = document.getElementById('backOnline');
-      if(backBtn) backBtn.onclick = ()=>renderOnlineHome();
+      if(backBtn) backBtn.onclick = ()=>{ sfx('tap'); renderOnlineHome(); };
     }
   }
+  let lastAnnouncedBattleId = null;
 
-  document.getElementById('btnBattle').onclick = openBattleModal;
+  // ---------- mis minijuegos, todos originales, para subir el cariño jugando ----------
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+  let minigameTimers = [];
+  function stopMinigameTimers(){ minigameTimers.forEach(t=>clearInterval(t)); minigameTimers=[]; }
+
+  function canPlayGames(){
+    if(pet.stage===0 || !pet.alive){ showToast('Tu mascota necesita nacer primero 🥚'); return false; }
+    if(pet.sleeping){ showToast(pet.name+' está durmiendo, despiértalo primero'); return false; }
+    if(pet.energy<10){ showToast(pet.name+' está muy cansado para jugar'); return false; }
+    return true;
+  }
+
+  function finishMinigame(gain, energyCost, toastMsg){
+    pet.happy = clamp(pet.happy+gain);
+    pet.energy = clamp(pet.energy-energyCost);
+    gainXp(Math.max(2, Math.round(gain/2)));
+    sfx('play');
+    showToast(toastMsg);
+    render(); savePet();
+  }
+
+  function showGameResult(title, scoreText, gain){
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p style="text-align:center;font-weight:800;">${title}</p>
+      <p class="small-note" style="text-align:center;">${scoreText} — +${gain} de ánimo 💗</p>
+      <div class="modal-actions"><button class="status-btn" id="backToGames">Volver a minijuegos</button></div>
+    `;
+    document.getElementById('backToGames').onclick=()=>{ sfx('tap'); renderGamesMenu(); };
+  }
+
+  function openGamesModal(){
+    if(!canPlayGames()) return;
+    const el = document.createElement('div');
+    el.className='modal-backdrop'; el.id='gamesModal';
+    el.innerHTML = `<div class="modal">
+      <button class="close-x" id="closeGames">✕</button>
+      <h3>MINIJUEGOS</h3>
+      <div id="gamesContent"></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    document.getElementById('closeGames').onclick=()=>{ stopMinigameTimers(); el.remove(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stopMinigameTimers(); el.remove(); } });
+    renderGamesMenu();
+  }
+
+  function renderGamesMenu(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p class="small-note">Jugar sube el ánimo de ${pet.name}, pero gasta algo de energía.</p>
+      <div class="modal-actions" style="flex-direction:column;gap:10px;">
+        <button class="status-btn" id="gameCatch">🍓 Atrapa la fruta</button>
+        <button class="status-btn" id="gameMemory">🧠 Memoria</button>
+        <button class="status-btn" id="gameSimon">🎵 Simón dice</button>
+      </div>
+    `;
+    document.getElementById('gameCatch').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startCatchGame(); };
+    document.getElementById('gameMemory').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startMemoryGame(); };
+    document.getElementById('gameSimon').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startSimonGame(); };
+  }
+
+  function startCatchGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Toca la izquierda o la derecha para mover la cesta. ¡20 segundos!</p>
+      <div class="game-hud"><span>Puntos: <b id="catchScore">0</b></span><span>Tiempo: <b id="catchTime">20</b>s</span></div>
+      <div class="game-area" id="catchArea">
+        <div class="game-zone" style="left:0;" id="zoneLeft"></div>
+        <div class="game-zone" style="right:0;" id="zoneRight"></div>
+        <div class="game-basket" id="basket" style="left:50%;"></div>
+      </div>
+    `;
+    let score=0, timeLeft=20, basketPos=50;
+    const area = document.getElementById('catchArea');
+    const basket = document.getElementById('basket');
+    const items = [];
+    const FRUITS=['🍓','🍎','🍇','🍊','🍋'];
+
+    document.getElementById('zoneLeft').onclick=()=>{ basketPos=Math.max(8,basketPos-14); basket.style.left=basketPos+'%'; };
+    document.getElementById('zoneRight').onclick=()=>{ basketPos=Math.min(92,basketPos+14); basket.style.left=basketPos+'%'; };
+
+    const spawnT = setInterval(()=>{
+      const itEl = document.createElement('div');
+      itEl.className='game-item';
+      itEl.textContent = FRUITS[Math.floor(Math.random()*FRUITS.length)];
+      const leftPct = 8+Math.random()*84;
+      itEl.style.left = leftPct+'%';
+      itEl.style.top = '0%';
+      area.appendChild(itEl);
+      items.push({el:itEl, left:leftPct, top:0});
+    }, 850);
+
+    const moveT = setInterval(()=>{
+      for(let i=items.length-1;i>=0;i--){
+        const it = items[i];
+        it.top += 4;
+        it.el.style.top = it.top+'%';
+        if(it.top>=88){
+          if(Math.abs(it.left-basketPos)<12){ score++; document.getElementById('catchScore').textContent=score; sfx('tap'); }
+          it.el.remove(); items.splice(i,1);
+        }
+      }
+    }, 60);
+
+    const timerT = setInterval(()=>{
+      timeLeft--;
+      document.getElementById('catchTime').textContent = timeLeft;
+      if(timeLeft<=0){
+        clearInterval(spawnT); clearInterval(moveT); clearInterval(timerT);
+        items.forEach(it=>it.el.remove());
+        const gain = Math.min(28, score*3);
+        finishMinigame(gain, 8, '¡'+pet.name+' atrapó '+score+' frutas! +'+gain+' de ánimo');
+        showGameResult('🍓 Atrapa la fruta', score+' frutas atrapadas', gain);
+      }
+    }, 1000);
+
+    minigameTimers.push(spawnT, moveT, timerT);
+  }
+
+  function startMemoryGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    const ICONS = ['🍓','🐸','🎈','⭐','🍩','🚀'];
+    let deck = [...ICONS, ...ICONS];
+    for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+    let flipped=[], matched=new Set(), moves=0, lock=false;
+
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Encuentra las 6 parejas con el menor número de intentos.</p>
+      <div class="game-hud"><span>Intentos: <b id="memMoves">0</b></span><span>Parejas: <b id="memPairs">0</b>/6</span></div>
+      <div class="memgrid" id="memGrid"></div>
+    `;
+    const grid = document.getElementById('memGrid');
+    deck.forEach((icon,idx)=>{
+      const b = document.createElement('button');
+      b.className='memcard'; b.dataset.idx=idx; b.dataset.icon=icon;
+      b.textContent='❔';
+      b.onclick=()=>{
+        if(lock || b.classList.contains('matched') || flipped.includes(b)) return;
+        sfx('tap');
+        b.textContent = icon;
+        flipped.push(b);
+        if(flipped.length===2){
+          moves++; document.getElementById('memMoves').textContent=moves;
+          lock=true;
+          const [a,bb]=flipped;
+          if(a.dataset.icon===bb.dataset.icon){
+            a.classList.add('matched'); bb.classList.add('matched');
+            matched.add(a.dataset.idx); matched.add(bb.dataset.idx);
+            document.getElementById('memPairs').textContent=matched.size/2;
+            flipped=[]; lock=false;
+            if(matched.size===deck.length){
+              const gain = Math.max(10, 30-moves);
+              finishMinigame(gain, 6, '¡'+pet.name+' completó la memoria en '+moves+' intentos! +'+gain+' de ánimo');
+              setTimeout(()=>showGameResult('🧠 Memoria', moves+' intentos', gain), 300);
+            }
+          } else {
+            setTimeout(()=>{ a.textContent='❔'; bb.textContent='❔'; flipped=[]; lock=false; }, 700);
+          }
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+
+  function startSimonGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    const COLOR_IDS = ['red','green','blue','yellow'];
+    let sequence=[], level=0, playerIdx=0, accepting=false;
+
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Memoriza y repite la secuencia de colores.</p>
+      <div class="game-hud"><span>Ronda: <b id="simonLevel">0</b></span></div>
+      <div class="simon-grid">
+        <button class="simon-btn simon-red" data-c="red"></button>
+        <button class="simon-btn simon-green" data-c="green"></button>
+        <button class="simon-btn simon-blue" data-c="blue"></button>
+        <button class="simon-btn simon-yellow" data-c="yellow"></button>
+      </div>
+    `;
+    const btns = {};
+    c.querySelectorAll('.simon-btn').forEach(b=>{ btns[b.dataset.c]=b; b.onclick=()=>handlePress(b.dataset.c); });
+
+    async function nextRound(){
+      accepting=false;
+      level++; document.getElementById('simonLevel').textContent=level;
+      sequence.push(COLOR_IDS[Math.floor(Math.random()*4)]);
+      await sleep(500);
+      for(const col of sequence){
+        btns[col].classList.add('lit'); sfx('tap'); await sleep(420);
+        btns[col].classList.remove('lit'); await sleep(220);
+      }
+      playerIdx=0; accepting=true;
+    }
+    function handlePress(col){
+      if(!accepting) return;
+      btns[col].classList.add('lit'); setTimeout(()=>btns[col].classList.remove('lit'),150);
+      sfx('tap');
+      if(sequence[playerIdx]===col){
+        playerIdx++;
+        if(playerIdx===sequence.length){ accepting=false; setTimeout(nextRound, 700); }
+      } else {
+        accepting=false;
+        const gain = Math.min(26, (level-1)*4);
+        finishMinigame(gain, 5, '¡'+pet.name+' llegó a la ronda '+(level-1)+' en Simón dice! +'+gain+' de ánimo');
+        setTimeout(()=>showGameResult('🎵 Simón dice', 'Llegaste a la ronda '+(level-1), gain), 300);
+      }
+    }
+    nextRound();
+  }
+
+  document.getElementById('btnBattle').onclick = ()=>{ sfx('tap'); openBattleModal(); };
+  document.getElementById('btnGames').onclick = ()=>{ sfx('tap'); openGamesModal(); };
+  document.getElementById('btnMute').onclick = ()=>{
+    ensureAudio();
+    soundOn = !soundOn;
+    document.getElementById('btnMute').textContent = soundOn ? '🔊' : '🔇';
+    if(soundOn) sfx('tap');
+  };
 
   loadPet().then(()=>{
     setInterval(()=>tick(true), TICK_MS);
