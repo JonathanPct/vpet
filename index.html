@@ -142,7 +142,8 @@
     box-shadow:0 0 22px 2px var(--glow, transparent) inset;transition:box-shadow .6s;
   }
   .hud{
-    position:absolute;top:6px;left:8px;right:8px;display:flex;justify-content:space-between;
+    position:fixed;top:58px;right:12px;left:auto;z-index:15;
+    display:flex;flex-direction:column;align-items:flex-end;gap:2px;
     font-family:'Press Start 2P',monospace;font-size:8px;color:var(--luz);text-shadow:0 0 4px rgba(0,0,0,.9);
   }
   .pathtag{position:absolute;bottom:6px;right:8px;font-family:'Press Start 2P',monospace;font-size:7px;
@@ -252,20 +253,39 @@
     font-size:9px;font-weight:800;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;z-index:3;}
   .hit-shake{animation:hitShake .25s;}
   @keyframes hitShake{0%,100%{transform:translate(0,0);} 25%{transform:translate(-4px,2px);} 50%{transform:translate(4px,-2px);} 75%{transform:translate(-3px,-3px);}}
-  .lunge-right{animation:lungeRight .38s ease-out;}
-  .lunge-left{animation:lungeLeft .38s ease-out;}
-  @keyframes lungeRight{0%{transform:translate(0,0) rotate(0);} 20%{transform:translate(-6px,0) rotate(-3deg);} 55%{transform:translate(28px,-4px) scale(1.12) rotate(4deg);} 100%{transform:translate(0,0) rotate(0);}}
-  @keyframes lungeLeft{0%{transform:translate(0,0) rotate(0);} 20%{transform:translate(6px,0) rotate(3deg);} 55%{transform:translate(-28px,-4px) scale(1.12) rotate(-4deg);} 100%{transform:translate(0,0) rotate(0);}}
-  .arena-shake{animation:arenaShake .32s;}
-  @keyframes arenaShake{0%,100%{transform:translate(0,0);} 15%{transform:translate(-4px,3px);} 30%{transform:translate(4px,-3px);} 45%{transform:translate(-3px,3px);} 60%{transform:translate(3px,-2px);} 75%{transform:translate(-2px,1px);}}
-  .clash-impact{position:absolute;top:50%;left:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;
-    background:radial-gradient(circle,#fff,var(--arcaneglow) 55%,transparent 75%);z-index:15;pointer-events:none;
-    animation:clashPop .35s ease-out forwards;}
-  @keyframes clashPop{0%{opacity:0;transform:scale(.2);} 40%{opacity:1;transform:scale(1.3);} 100%{opacity:0;transform:scale(1.8);}}
-  .dmg-float{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-weight:900;font-size:15px;
-    color:#ff5c5c;text-shadow:0 1px 2px rgba(0,0,0,.6);pointer-events:none;z-index:16;
-    animation:dmgFloat .85s ease-out forwards;}
-  @keyframes dmgFloat{0%{opacity:0;transform:translate(-50%,4px);} 20%{opacity:1;transform:translate(-50%,-4px);} 100%{opacity:0;transform:translate(-50%,-30px);}}
+  .lunge-right{animation:lungeRight .5s cubic-bezier(.25,.1,.3,1);}
+  .lunge-left{animation:lungeLeft .5s cubic-bezier(.25,.1,.3,1);}
+  @keyframes lungeRight{
+    0%{transform:translate(0,0) scale(1) rotate(0); filter:blur(0);}
+    18%{transform:translate(-14px,3px) scale(.9) rotate(-6deg); filter:blur(0);}
+    55%{transform:translate(54px,-10px) scale(1.22) rotate(8deg); filter:blur(2px);}
+    72%{transform:translate(48px,-8px) scale(1.15) rotate(6deg); filter:blur(0);}
+    100%{transform:translate(0,0) scale(1) rotate(0); filter:blur(0);}
+  }
+  @keyframes lungeLeft{
+    0%{transform:translate(0,0) scale(1) rotate(0); filter:blur(0);}
+    18%{transform:translate(14px,3px) scale(.9) rotate(6deg); filter:blur(0);}
+    55%{transform:translate(-54px,-10px) scale(1.22) rotate(-8deg); filter:blur(2px);}
+    72%{transform:translate(-48px,-8px) scale(1.15) rotate(-6deg); filter:blur(0);}
+    100%{transform:translate(0,0) scale(1) rotate(0); filter:blur(0);}
+  }
+  .arena-shake{animation:arenaShake .35s;}
+  @keyframes arenaShake{0%,100%{transform:translate(0,0);} 12%{transform:translate(-5px,4px);} 26%{transform:translate(5px,-4px);} 40%{transform:translate(-4px,4px);} 54%{transform:translate(4px,-3px);} 68%{transform:translate(-3px,2px);} 82%{transform:translate(2px,-1px);}}
+  .special-glow .battle-sprite-box{animation:specialGlow .55s ease-out;}
+  @keyframes specialGlow{0%{filter:brightness(1);box-shadow:none;} 50%{filter:brightness(1.9) saturate(1.6);box-shadow:0 0 22px 7px var(--arcaneglow);} 100%{filter:brightness(1);box-shadow:none;}}
+  .defend-brace .battle-sprite-box{animation:defendBrace .4s ease-out;}
+  @keyframes defendBrace{0%{transform:scale(1);} 40%{transform:scale(.88);box-shadow:inset 0 0 0 3px rgba(125,255,179,.7);} 100%{transform:scale(1);}}
+  .arena-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;border-radius:inherit;
+    animation:arenaFlash .28s ease-out forwards;}
+  @keyframes arenaFlash{0%{opacity:0;} 25%{opacity:.6;} 100%{opacity:0;}}
+  .clash-impact{position:absolute;top:50%;left:50%;width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;
+    background:radial-gradient(circle,#fff,var(--arcaneglow) 45%,transparent 72%);z-index:21;pointer-events:none;
+    animation:clashPop .4s ease-out forwards;}
+  @keyframes clashPop{0%{opacity:0;transform:scale(.15);} 35%{opacity:1;transform:scale(1.5);} 100%{opacity:0;transform:scale(2.4);}}
+  .dmg-float{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-weight:900;font-size:17px;
+    color:#ff5c5c;text-shadow:0 1px 3px rgba(0,0,0,.7);pointer-events:none;z-index:22;
+    animation:dmgFloat .9s cubic-bezier(.2,.9,.3,1) forwards;}
+  @keyframes dmgFloat{0%{opacity:0;transform:translate(-50%,10px) scale(.4);} 18%{opacity:1;transform:translate(-50%,-8px) scale(1.4);} 38%{transform:translate(-50%,-3px) scale(1);} 100%{opacity:0;transform:translate(-50%,-32px) scale(1);}}
   .type-badge{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;margin-top:2px;
     background:rgba(125,255,179,.15);color:var(--luz);border:1px solid rgba(125,255,179,.3);}
   .defeated-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
@@ -349,7 +369,7 @@ body{padding:0;align-items:stretch;}
   background:linear-gradient(rgba(8,6,16,.85),rgba(8,6,16,0));
 }
 .hud{top:calc(env(safe-area-inset-top) + 58px);}
-.pathtag{top:calc(env(safe-area-inset-top) + 58px);bottom:auto;}
+.pathtag{top:calc(env(safe-area-inset-top) + 92px);bottom:auto;right:12px;}
 
 .bottom-panel{
   position:fixed;left:0;right:0;bottom:0;z-index:20;
@@ -1568,7 +1588,7 @@ body{padding:0;align-items:stretch;}
             s.p2.move=mv;
             const r = resolveMoves(s.p1.move, s.p2.move, s.p1.power, s.p2.power, s.p1.path, s.p2.path);
             sfx('hit');
-            await playBattleClash('lbFighter1','lbFighter2', Math.max(0,Math.round(r.dmgToA-r.healA)), Math.max(0,Math.round(r.dmgToB-r.healB)));
+            await playBattleClash('lbFighter1','lbFighter2', Math.max(0,Math.round(r.dmgToA-r.healA)), Math.max(0,Math.round(r.dmgToB-r.healB)), s.p1.move, s.p2.move);
             s.p1.hp = Math.min(100, Math.max(0, s.p1.hp - r.dmgToA + r.healA));
             s.p2.hp = Math.min(100, Math.max(0, s.p2.hp - r.dmgToB + r.healB));
             s.log.push(s.p1.name+' usó '+s.p1.move+' · '+s.p2.name+' usó '+s.p2.move+' — '+r.text);
@@ -1711,7 +1731,7 @@ body{padding:0;align-items:stretch;}
           const mmv = MOVES3[Math.floor(Math.random()*3)];
           const r = resolveMoves(mv, mmv, s.p1.power, s.m.power, s.p1.path, null);
           sfx('hit');
-          await playBattleClash('dgFighterMe','dgFighterMon', Math.max(0,Math.round(r.dmgToA-r.healA)), Math.max(0,Math.round(r.dmgToB-r.healB)));
+          await playBattleClash('dgFighterMe','dgFighterMon', Math.max(0,Math.round(r.dmgToA-r.healA)), Math.max(0,Math.round(r.dmgToB-r.healB)), mv, mmv);
           s.p1.hp = Math.min(100, Math.max(0, s.p1.hp - r.dmgToA + r.healA));
           s.m.hp = Math.min(100, Math.max(0, s.m.hp - r.dmgToB + r.healB));
           s.log.push(s.p1.name+' usó '+mv+' · '+s.m.name+' usó '+mmv+' — '+r.text);
@@ -1877,6 +1897,7 @@ body{padding:0;align-items:stretch;}
         doc.p1.hp = Math.min(100, Math.max(0, doc.p1.hp - r.dmgToA + r.healA));
         doc.p2.hp = Math.min(100, Math.max(0, doc.p2.hp - r.dmgToB + r.healB));
         doc.log.push(doc.p1.name+' usó '+doc.p1.move+' · '+doc.p2.name+' usó '+doc.p2.move+' — '+r.text);
+        doc.lastMove1 = doc.p1.move; doc.lastMove2 = doc.p2.move;
         doc.p1.move=null; doc.p2.move=null;
         doc.resolvedRound = doc.round;
         doc.round += 1;
@@ -1929,7 +1950,7 @@ body{padding:0;align-items:stretch;}
       lastOnlineShakeRound = doc.resolvedRound;
       const dmg1 = Math.max(0, Math.round(lastOnlineHp.p1 - doc.p1.hp));
       const dmg2 = Math.max(0, Math.round(lastOnlineHp.p2 - doc.p2.hp));
-      playBattleClash('obFighter1','obFighter2', dmg1, dmg2);
+      playBattleClash('obFighter1','obFighter2', dmg1, dmg2, doc.lastMove1, doc.lastMove2);
     }
     lastOnlineHp = {p1:doc.p1.hp, p2:doc.p2.hp};
     if(!doc.finished && !myMoveSet){
@@ -1975,26 +1996,45 @@ body{padding:0;align-items:stretch;}
     box.appendChild(el);
     setTimeout(()=>el.remove(), 850);
   }
-  async function playBattleClash(id1, id2, dmg1, dmg2){
+  function moveAnimClass(move, dir){
+    if(move==='Ataque') return dir==='right' ? 'lunge-right' : 'lunge-left';
+    if(move==='Especial') return 'special-glow';
+    if(move==='Defensa') return 'defend-brace';
+    return dir==='right' ? 'lunge-right' : 'lunge-left';
+  }
+  async function playBattleClash(id1, id2, dmg1, dmg2, move1, move2){
     const f1 = document.getElementById(id1);
     const f2 = document.getElementById(id2);
     if(!f1 || !f2) return;
-    f1.classList.add('lunge-right');
-    f2.classList.add('lunge-left');
-    await sleep(160);
-    const box1 = f1.querySelector('.battle-sprite-box');
-    if(box1){
+    const cls1 = moveAnimClass(move1||'Ataque', 'right');
+    const cls2 = moveAnimClass(move2||'Ataque', 'left');
+    f1.classList.add(cls1);
+    f2.classList.add(cls2);
+    await sleep(260);
+    const arena = f1.closest('.vs');
+    if(arena){
+      arena.classList.add('arena-shake');
       const flash = document.createElement('div');
-      flash.className = 'clash-impact';
-      box1.appendChild(flash);
-      setTimeout(()=>flash.remove(), 400);
+      flash.className = 'arena-flash';
+      arena.appendChild(flash);
+      setTimeout(()=>flash.remove(), 300);
     }
+    [f1, f2].forEach((f)=>{
+      const box = f.querySelector('.battle-sprite-box');
+      if(box){
+        const impact = document.createElement('div');
+        impact.className = 'clash-impact';
+        box.appendChild(impact);
+        setTimeout(()=>impact.remove(), 420);
+      }
+    });
     spawnDmgFloat(f1, dmg1);
     spawnDmgFloat(f2, dmg2);
-    await sleep(220);
-    f1.classList.remove('lunge-right');
-    f2.classList.remove('lunge-left');
-    await sleep(120);
+    await sleep(280);
+    f1.classList.remove(cls1);
+    f2.classList.remove(cls2);
+    if(arena) arena.classList.remove('arena-shake');
+    await sleep(140);
   }
   let minigameTimers = [];
   function stopMinigameTimers(){ minigameTimers.forEach(t=>clearInterval(t)); minigameTimers=[]; }
