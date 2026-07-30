@@ -131,7 +131,7 @@
   .hudcorner.tr{top:3px;right:3px;border-top:2px solid;border-right:2px solid;}
   .hudcorner.bl{bottom:3px;left:3px;border-bottom:2px solid;border-left:2px solid;}
   .hudcorner.br{bottom:3px;right:3px;border-bottom:2px solid;border-right:2px solid;}
-  canvas#screen{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;}
+  #screen{display:block;image-rendering:pixelated;image-rendering:crisp-edges;}
   .scanlines{
     position:absolute;inset:0;pointer-events:none;
     background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 4px);
@@ -192,6 +192,29 @@
   .action-btn:active{transform:translateY(2px) scale(.97);box-shadow:0 0 0 1px var(--arcaneglow);}
   .action-btn:disabled{opacity:.3;filter:grayscale(.6);}
   .action-btn .ico{font-size:18px;filter:drop-shadow(0 0 4px rgba(125,255,179,.7));}
+
+  .home-btn{
+    position:relative;overflow:visible;
+    border-radius:50%;aspect-ratio:1/1;width:100%;
+    background:radial-gradient(circle at 35% 28%, rgba(255,255,255,.18), transparent 55%), var(--btnglow,#4a3d6b);
+    border:none;
+    box-shadow:0 6px 14px rgba(0,0,0,.4), 0 0 0 3px rgba(255,255,255,.06), inset 0 2px 4px rgba(255,255,255,.15), inset 0 -6px 10px rgba(0,0,0,.25);
+    display:flex;align-items:center;justify-content:center;padding:0;
+  }
+  .home-btn::before{display:none;}
+  .home-btn .ico{font-size:26px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));}
+  .home-btn .home-label{
+    position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:7px;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:10.5px;color:var(--ink);
+    white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.6);
+  }
+  .home-btn:active{transform:translateY(2px) scale(.95);}
+  #btnFeed.home-btn{--btnglow:linear-gradient(160deg,#ffb84d,#c4791e);}
+  #btnPlay.home-btn{--btnglow:linear-gradient(160deg,#ff8fd0,#c4368f);}
+  #btnClean.home-btn{--btnglow:linear-gradient(160deg,#5ed6ff,#1e8fc4);}
+  #btnSleep.home-btn{--btnglow:linear-gradient(160deg,#7ea3ff,#3a5cc4);}
+  #btnMore.home-btn{--btnglow:linear-gradient(160deg,#b085ff,#6a3fc4);}
+  .controls{padding-bottom:20px;}
   .status-btn{
     grid-column:span 3;clip-path:none;aspect-ratio:auto;border-radius:14px;flex-direction:row;gap:8px;padding:11px;font-size:11px;
     box-shadow:0 0 0 1px var(--arcaneglow), inset 0 0 10px rgba(79,214,255,.12);
@@ -232,21 +255,42 @@
   .tabrow button.active{background:linear-gradient(160deg,var(--luz),#2a9);color:#0a1712;}
   .vs{
     position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:6px;
-    margin-bottom:10px;padding:30px 10px 12px;border-radius:14px;min-height:120px;
-    background:linear-gradient(180deg,#0d1b2a,#101f30 60%,#0b1622);
+    margin-bottom:10px;padding:34px 14px 14px;border-radius:14px;min-height:150px;
+    background:linear-gradient(180deg,#2a2145 0%,#5a3a58 32%,#c97a4a 52%,#8a3f34 66%,#2c1620 100%);
     border:1px solid rgba(125,255,179,.25);overflow:hidden;
   }
-  .arena-hpbar{position:absolute;top:8px;width:40%;height:7px;border-radius:4px;background:#000;
+  .vs::before{
+    content:'';position:absolute;left:0;right:0;top:30px;height:50px;z-index:0;pointer-events:none;
+    background-color:rgba(55,45,85,.55);
+    clip-path:polygon(0% 100%,6% 45%,16% 75%,26% 30%,36% 68%,48% 25%,58% 62%,68% 20%,80% 58%,90% 35%,100% 70%,100% 100%);
+  }
+  .vs::after{
+    content:'';position:absolute;left:0;right:0;bottom:0;height:42%;z-index:0;pointer-events:none;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.15) 0 1px, transparent 1px 20px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.1) 0 1px, transparent 1px 14px),
+      linear-gradient(180deg, rgba(140,70,45,.35), rgba(35,15,12,.65));
+  }
+  .arena-pillar{position:absolute;top:0;bottom:0;width:13px;z-index:1;pointer-events:none;
+    background:linear-gradient(90deg,#6b4a34,#3d2818,#6b4a34);
+    box-shadow:inset 0 0 4px rgba(0,0,0,.7);}
+  .arena-pillar.l{left:6px;}
+  .arena-pillar.r{right:6px;}
+  .arena-hpbar{position:absolute;top:8px;width:36%;height:7px;border-radius:4px;background:#000;z-index:2;
     box-shadow:inset 0 1px 2px rgba(0,0,0,.7);overflow:hidden;}
-  .arena-hpbar.left{left:8px;}
-  .arena-hpbar.right{right:8px;}
+  .arena-hpbar.left{left:22px;}
+  .arena-hpbar.right{right:22px;}
   .arena-hpbar .arena-hpfill{height:100%;transition:width .4s;}
   .arena-hpbar.left .arena-hpfill{background:linear-gradient(90deg,#5eff9e,#baffcf);}
   .arena-hpbar.right .arena-hpfill{background:linear-gradient(90deg,#ff5c5c,#ffb3b3);margin-left:auto;}
-  .vs-badge{position:absolute;top:6px;left:50%;transform:translateX(-50%);
+  .arena-portrait{position:absolute;top:4px;width:15px;height:15px;border-radius:50%;z-index:2;
+    box-shadow:0 0 0 2px rgba(255,255,255,.25), 0 0 6px rgba(0,0,0,.5);}
+  .arena-portrait.left{left:4px;background:radial-gradient(circle,var(--luz),#1e9f6a);}
+  .arena-portrait.right{right:4px;background:radial-gradient(circle,#ff8a8a,#8a1e1e);}
+  .vs-badge{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:2;
     font-family:'Press Start 2P',monospace;font-size:8px;color:var(--muted);text-shadow:0 0 4px rgba(0,0,0,.8);}
   .fighter{flex:1;text-align:center;position:relative;z-index:2;}
-  .battle-sprite-box{width:64px;height:64px;margin:0 auto 4px;border-radius:12px;overflow:hidden;background:#0a1712;border:1px solid rgba(125,255,179,.3);position:relative;}
+  .battle-sprite-box{width:84px;height:84px;margin:0 auto 4px;position:relative;background:transparent;}
   .battle-sprite-box canvas{width:100%;height:100%;image-rendering:pixelated;display:block;}
   .name-tag{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
     background:rgba(0,0,0,.72);color:#fff;padding:1px 6px;border-radius:6px;
@@ -286,11 +330,19 @@
     color:#ff5c5c;text-shadow:0 1px 3px rgba(0,0,0,.7);pointer-events:none;z-index:22;
     animation:dmgFloat .9s cubic-bezier(.2,.9,.3,1) forwards;}
   @keyframes dmgFloat{0%{opacity:0;transform:translate(-50%,10px) scale(.4);} 18%{opacity:1;transform:translate(-50%,-8px) scale(1.4);} 38%{transform:translate(-50%,-3px) scale(1);} 100%{opacity:0;transform:translate(-50%,-32px) scale(1);}}
-  .type-badge{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;margin-top:2px;
+  .type-badge{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:6px;
     background:rgba(125,255,179,.15);color:var(--luz);border:1px solid rgba(125,255,179,.3);}
-  .defeated-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-  .defeated-chip{font-size:10.5px;padding:5px 9px;border-radius:8px;background:rgba(157,77,255,.1);
-    border:1px solid rgba(157,77,255,.3);cursor:pointer;color:var(--ink);}
+  .reward-preview{text-align:center;margin-top:8px;}
+  .reward-line{font-size:11.5px;color:var(--ink);margin-top:6px;}
+  .enemy-pick-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .enemy-pick{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;
+    background:rgba(157,77,255,.07);border:1px solid rgba(157,77,255,.25);cursor:pointer;}
+  .enemy-pick-icon{font-size:26px;flex-shrink:0;}
+  .enemy-pick-info{flex:1;display:flex;flex-direction:column;}
+  .enemy-pick-info b{font-size:12.5px;}
+  .enemy-pick-info small{color:var(--muted);font-size:10.5px;}
+  .mini-fight-btn{flex-shrink:0;padding:6px 12px;font-size:11px;background:linear-gradient(160deg,var(--metal-lt),var(--metal-dk));
+    border:1px solid var(--arcaneglow);border-radius:8px;color:var(--ink);}
   .fighter b{display:block;font-size:13px;}
   .fighter small{color:var(--muted);}
   .hpbar{height:10px;border-radius:5px;background:#000;margin-top:6px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.8);}
@@ -301,18 +353,28 @@
   .challenge-item{display:flex;justify-content:space-between;align-items:center;padding:9px 4px;
     border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
   .challenge-item button{padding:6px 12px;}
-  .evo-stage{border-left:2px dashed var(--arcaneglow);padding-left:14px;margin-left:7px;padding-bottom:16px;position:relative;}
-  .evo-stage::before{content:'';position:absolute;left:-5px;top:0;width:8px;height:8px;border-radius:50%;background:var(--arcaneglow);box-shadow:0 0 5px var(--arcaneglow);}
-  .evo-stage:last-child{border-left:2px dashed transparent;}
-  .evo-stagetitle{font-weight:800;font-size:13px;margin-bottom:2px;}
   .evo-gate{font-size:11px;color:var(--muted);margin-bottom:6px;}
-  .evo-branch{background:rgba(157,77,255,.07);border:1px solid rgba(157,77,255,.2);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12px;}
-  .evo-branch.current{border-color:var(--luz);background:rgba(94,255,158,.1);}
-  .evo-branch b{display:block;font-size:12.5px;margin-bottom:2px;}
-  .evo-trend{font-size:11px;color:var(--luz);margin-top:8px;font-weight:700;}
+  .evo-branch{background:rgba(157,77,255,.07);border:1px solid rgba(157,77,255,.2);border-radius:8px;padding:4px 8px;font-size:11px;}
+  .evo-branch.current{border-color:var(--luz);background:rgba(94,255,158,.1);color:var(--luz);}
+  .evo-trend{font-size:11px;color:var(--luz);margin-top:6px;margin-bottom:4px;font-weight:700;}
   .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-left:6px;}
   .evo-preview-box{width:52px;height:52px;flex-shrink:0;border-radius:8px;overflow:hidden;background:#0a1712;border:1px solid rgba(157,77,255,.3);}
   .evo-preview-box canvas{width:100%;height:100%;image-rendering:pixelated;display:block;}
+  .eflow{display:flex;flex-direction:column;align-items:center;}
+  .enode{background:rgba(157,77,255,.08);border:1px solid rgba(157,77,255,.3);border-radius:10px;
+    padding:8px 12px;text-align:center;font-size:12px;font-weight:800;min-width:140px;}
+  .enode.current{border-color:var(--luz);background:rgba(94,255,158,.12);box-shadow:0 0 8px rgba(94,255,158,.25);color:var(--luz);}
+  .enode small{display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:3px;}
+  .enode.current small{color:var(--luz);opacity:.8;}
+  .econnector{width:2px;height:14px;background:var(--arcaneglow-dk);}
+  .efork{width:100%;position:relative;}
+  .efork-line{width:2px;height:14px;background:var(--arcaneglow-dk);margin:0 auto;}
+  .efork-row{display:flex;justify-content:center;gap:6px;position:relative;}
+  .efork-row::before{content:'';position:absolute;top:0;left:18%;right:18%;height:2px;background:var(--arcaneglow-dk);}
+  .efork-row.three::before{left:10%;right:10%;}
+  .efork-branch{flex:1;display:flex;flex-direction:column;align-items:center;max-width:110px;}
+  .efork-stem{width:2px;height:12px;background:var(--arcaneglow-dk);}
+  .enode.small{font-size:10.5px;padding:6px 8px;min-width:0;width:100%;}
   .small-note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5;}
   #cineFlash{position:fixed;inset:0;background:#fff;opacity:0;z-index:1000;pointer-events:none;transition:opacity .12s;}
   #cineFlash.on{opacity:1;}
@@ -431,11 +493,11 @@ body{padding:0;align-items:stretch;}
     <div class="effects-row" id="effectsRow"></div>
 
     <div class="controls">
-      <button id="btnFeed" class="action-btn"><span class="ico">🍖</span>Alimentar</button>
-      <button id="btnPlay" class="action-btn"><span class="ico">🎮</span>Jugar</button>
-      <button id="btnClean" class="action-btn"><span class="ico">🧹</span>Limpiar</button>
-      <button id="btnSleep" class="action-btn"><span class="ico">😴</span>Dormir</button>
-      <button id="btnMore" class="action-btn"><span class="ico">☰</span>Más</button>
+      <button id="btnFeed" class="action-btn home-btn"><span class="ico">🍖</span><span class="home-label">Alimentar</span></button>
+      <button id="btnPlay" class="action-btn home-btn"><span class="ico">🎮</span><span class="home-label">Jugar</span></button>
+      <button id="btnClean" class="action-btn home-btn"><span class="ico">🧹</span><span class="home-label">Limpiar</span></button>
+      <button id="btnSleep" class="action-btn home-btn"><span class="ico">😴</span><span class="home-label">Dormir</span></button>
+      <button id="btnMore" class="action-btn home-btn"><span class="ico">☰</span><span class="home-label">Más</span></button>
     </div>
 
   </div>
@@ -730,10 +792,10 @@ body{padding:0;align-items:stretch;}
   }
 
   const AGE_HATCH = 3;
-  const LEVEL_CHILD = 3;
-  const LEVEL_ADULT = 8;
-  const LEVEL_PERFECT = 15;
-  const LEVEL_ULTIMATE = 25;
+  const LEVEL_CHILD = 2;
+  const LEVEL_ADULT = 4;
+  const LEVEL_PERFECT = 7;
+  const LEVEL_ULTIMATE = 12;
   const TICK_MS = 4000;
   const SICK_DEATH_TICKS = 14;
 
@@ -1107,9 +1169,10 @@ body{padding:0;align-items:stretch;}
     ctx.beginPath(); ctx.ellipse(cx*cell, (cy+7)*cell, 5*cell,1.1*cell,0,0,Math.PI*2); ctx.fill();
   }
 
-  function drawCreature(pet){
+  function drawCreature(pet, transparent){
     const {stage, frame, sick, sleeping, temperament} = pet;
-    drawSceneBackground(pet.bgSeed);
+    if(transparent){ ctx.clearRect(0,0,canvas.width,canvas.height); }
+    else { drawSceneBackground(pet.bgSeed); }
     const cx=12, cy=13.5;
     const sizes = {1:[4.6,4.2],2:[5.6,5.0],3:[6.8,6.2],4:[7.8,7.2],5:[8.8,8.2]};
     let [rx,ry] = sizes[stage];
@@ -1301,7 +1364,7 @@ body{padding:0;align-items:stretch;}
     const medBtn0 = document.getElementById('btnMed');
     if(medBtn0) medBtn0.disabled = !pet.sick;
     document.getElementById('btnSleep').querySelector('.ico').textContent = pet.sleeping ? '⏰' : '😴';
-    document.getElementById('btnSleep').lastChild.textContent = pet.sleeping ? 'Despertar' : 'Dormir';
+    document.getElementById('btnSleep').querySelector('.home-label').textContent = pet.sleeping ? 'Despertar' : 'Dormir';
     ['btnFeed','btnPlay','btnClean'].forEach(id=>document.getElementById(id).disabled = pet.sleeping || !pet.alive);
     const medBtn = document.getElementById('btnMed');
     if(medBtn) medBtn.disabled = !pet.sick || !pet.alive;
@@ -1361,7 +1424,7 @@ body{padding:0;align-items:stretch;}
     pet.sac = clamp(pet.sac+28);
     pet.happy = clamp(pet.happy+4);
     pet.feedCount++;
-    gainXp(2);
+    gainXp(4);
     if(pet.poopTimer===0 && pet.poops<4) pet.poopTimer = 6;
     showToast(pet.name+' ha comido 🍖');
     sfx('feed');
@@ -1374,7 +1437,7 @@ body{padding:0;align-items:stretch;}
     pet.energy = clamp(pet.energy-14);
     pet.sac = clamp(pet.sac-6);
     pet.playCount++;
-    gainXp(3);
+    gainXp(6);
     showToast('¡'+pet.name+' se divirtió jugando! 🎮');
     sfx('play');
     render(); savePet();
@@ -1504,10 +1567,11 @@ body{padding:0;align-items:stretch;}
     </div>`;
     document.getElementById('modalRoot').appendChild(el);
     refreshScrollLock();
-    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); el.remove(); refreshScrollLock(); };
-    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); el.remove(); refreshScrollLock(); } });
+    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); stopBattleIdle(); el.remove(); refreshScrollLock(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); stopBattleIdle(); el.remove(); refreshScrollLock(); } });
     function setTab(t){
       stopBattlePoll();
+      stopBattleIdle();
       document.getElementById('tabLocal').classList.toggle('active', t==='local');
       document.getElementById('tabOnline').classList.toggle('active', t==='online');
       document.getElementById('tabDungeon').classList.toggle('active', t==='dungeon');
@@ -1558,6 +1622,8 @@ body{padding:0;align-items:stretch;}
     const finished = s.p1.hp<=0 || s.p2.hp<=0;
     c.innerHTML = `
       <div class="vs">
+        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
+        <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
         <div class="arena-hpbar left"><div class="arena-hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div>
         <div class="arena-hpbar right"><div class="arena-hpfill" style="width:${Math.max(0,s.p2.hp)}%"></div></div>
         <div class="vs-badge">VS</div>
@@ -1568,16 +1634,20 @@ body{padding:0;align-items:stretch;}
         <div class="modal-actions"><button id="againLocal">Volver a jugar</button></div>`
       : `<p class="small-note" style="text-align:center;">Turno de <b>${active.name}</b> — elige movimiento:</p>
         <div class="movegrid">
-          <button data-mv="Ataque">⚔️<br>Ataque</button>
-          <button data-mv="Especial">✨<br>Especial</button>
-          <button data-mv="Defensa">🛡️<br>Defensa</button>
+          <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
+          <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
+          <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
         </div>`}
       <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
     const cv1 = document.getElementById('lbCanvas1'), cv2 = document.getElementById('lbCanvas2');
-    if(cv1){ useCanvas(cv1); drawCreature({...s.p1, stage:s.p1.stage||3, frame:0, sick:false, sleeping:false}); }
-    if(cv2){ useCanvas(cv2); drawCreature({...s.p2, stage:s.p2.stage||3, frame:0, sick:false, sleeping:false}); }
+    if(cv1){ useCanvas(cv1); drawCreature({...s.p1, stage:s.p1.stage||3, frame:0, sick:false, sleeping:false}, true); }
+    if(cv2){ useCanvas(cv2); drawCreature({...s.p2, stage:s.p2.stage||3, frame:0, sick:false, sleeping:false}, true); }
     useScreenCanvas();
+    startBattleIdle(['lbCanvas1','lbCanvas2'], ()=>[
+      {...s.p1, stage:s.p1.stage||3, sick:false, sleeping:false},
+      {...s.p2, stage:s.p2.stage||3, sick:false, sleeping:false}
+    ]);
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=async ()=>{
@@ -1656,28 +1726,66 @@ body{padding:0;align-items:stretch;}
     }
   }
 
+  // mientras espero mi turno, no quiero que los luchadores se queden congelados: los redibujo cada poco con un frame que avanza, así respiran/botan solos
+  let battleIdleTimer = null;
+  function stopBattleIdle(){ if(battleIdleTimer){ clearInterval(battleIdleTimer); battleIdleTimer=null; } }
+  function startBattleIdle(canvasIds, getSnaps){
+    stopBattleIdle();
+    let f = 0;
+    battleIdleTimer = setInterval(()=>{
+      const cvs = canvasIds.map(id=>document.getElementById(id));
+      if(cvs.some(cv=>!cv)){ stopBattleIdle(); return; }
+      f++;
+      const snaps = getSnaps();
+      cvs.forEach((cv,i)=>{ if(snaps[i]){ useCanvas(cv); drawCreature({...snaps[i], frame:f}, true); } });
+      useScreenCanvas();
+    }, 350);
+  }
+
   let dungeonState = null;
   function renderDungeonHome(){
     const c = document.getElementById('battleContent');
     const monster = generateMonster(pet.dungeonFloor);
+    const rew = dungeonRewards(monster);
     const defeated = (pet.dungeonDefeated||[]).filter(f=>f!==pet.dungeonFloor);
     c.innerHTML = `
-      <p class="small-note" style="text-align:center;">Gana combates para subir de piso, ganar XP y puntos de stats según el tipo de enemigo. Cuanto más nivel tengas, menos te dará cada combate.</p>
+      <p class="small-note" style="text-align:center;">Gana combates para subir de piso. Cuanto más nivel tengas, menos te dará cada combate.</p>
       <div class="vs">
+        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
         <div class="vs-badge">VS</div>
         <div class="fighter"><div class="battle-sprite-box"><canvas id="dungeonPreviewMe" width="200" height="200"></canvas><div class="name-tag">${pet.name}</div></div><small>Nv.${pet.level}</small></div>
-        <div class="fighter"><div class="battle-sprite-box"><canvas id="dungeonPreviewMon" width="200" height="200"></canvas><div class="name-tag">${monster.name}</div></div><small>Piso ${monster.floor}</small><div class="type-badge">${MONSTER_TYPE_LABEL[monster.type]}</div></div>
+        <div class="fighter"><div class="battle-sprite-box"><canvas id="dungeonPreviewMon" width="200" height="200"></canvas><div class="name-tag">${monster.name}</div></div><small>Piso ${monster.floor}</small></div>
+      </div>
+      <div class="reward-preview">
+        <span class="type-badge">${MONSTER_TYPE_LABEL[monster.type]}</span>
+        <div class="reward-line">🏆 Recompensa por ganar: <b>+${rew.xp} XP</b> · <b>+${rew.statPts} ${STAT_LABEL[monster.type]||'de todo'}</b></div>
       </div>
       <div class="modal-actions"><button class="status-btn action-btn" id="startDungeon">⚔️ Enfrentarse</button></div>
-      ${defeated.length ? `<h3 style="font-size:11px;margin-top:16px;">ENEMIGOS YA DERROTADOS</h3>
-        <p class="small-note">Puedes volver a enfrentarte a ellos, aunque den menos recompensa que un piso nuevo.</p>
-        <div class="defeated-list">${defeated.map(f=>`<span class="defeated-chip" data-floor="${f}">Piso ${f}</span>`).join('')}</div>` : ''}
+      ${defeated.length ? `<h3 style="font-size:11px;margin-top:16px;">🗡️ ELEGIR ENEMIGO YA DERROTADO</h3>
+        <p class="small-note">Puedes repetir combate contra cualquiera de estos, aunque den menos recompensa que el piso actual.</p>
+        <div class="enemy-pick-list">
+          ${defeated.map(f=>{
+            const m = generateMonster(f);
+            const r = dungeonRewards(m);
+            return `<div class="enemy-pick" data-floor="${f}">
+              <span class="enemy-pick-icon">${m.icon||'👾'}</span>
+              <div class="enemy-pick-info">
+                <b>${m.name}</b><small>Piso ${f} · ${MONSTER_TYPE_LABEL[m.type]}</small>
+                <small>+${r.xp} XP · +${r.statPts} ${STAT_LABEL[m.type]||'de todo'}</small>
+              </div>
+              <button class="mini-fight-btn">Elegir</button>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
     `;
     document.getElementById('startDungeon').onclick = ()=>{ sfx('tap'); startDungeonBattle(monster); };
     const meCv = document.getElementById('dungeonPreviewMe');
-    if(pet.stage>0){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet)); useScreenCanvas(); }
+    if(pet.stage>0){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet), true); useScreenCanvas(); }
     const monCv = document.getElementById('dungeonPreviewMon');
-    if(monCv){ useCanvas(monCv); drawCreature(monster.sprite); useScreenCanvas(); }
+    if(monCv){ useCanvas(monCv); drawCreature(monster.sprite, true); useScreenCanvas(); }
+    if(pet.stage>0){
+      startBattleIdle(['dungeonPreviewMe','dungeonPreviewMon'], ()=>[snapshotVisual(pet), monster.sprite]);
+    }
     c.querySelectorAll('[data-floor]').forEach(chip=>{
       chip.onclick=()=>{ sfx('tap'); startDungeonBattle(generateMonster(parseInt(chip.getAttribute('data-floor'),10))); };
     });
@@ -1699,11 +1807,13 @@ body{padding:0;align-items:stretch;}
     const finished = s.p1.hp<=0 || s.m.hp<=0;
     c.innerHTML = `
       <div class="vs">
+        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
+        <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
         <div class="arena-hpbar left"><div class="arena-hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div>
         <div class="arena-hpbar right"><div class="arena-hpfill" style="width:${Math.max(0,s.m.hp)}%"></div></div>
         <div class="vs-badge">VS</div>
         <div class="fighter" id="dgFighterMe"><div class="battle-sprite-box"><canvas id="dungeonBattleMe" width="200" height="200"></canvas><div class="name-tag">${s.p1.name}</div></div><small>${s.p1.species}</small></div>
-        <div class="fighter" id="dgFighterMon"><div class="battle-sprite-box"><canvas id="dungeonBattleMon" width="200" height="200"></canvas><div class="name-tag">${s.m.name}</div></div><small>${MONSTER_TYPE_LABEL[s.m.type]}</small></div>
+        <div class="fighter" id="dgFighterMon"><div class="battle-sprite-box"><canvas id="dungeonBattleMon" width="200" height="200"></canvas><div class="name-tag">${s.m.name}</div></div><span class="type-badge">${MONSTER_TYPE_LABEL[s.m.type]}</span></div>
       </div>
       ${finished ? (s.m.hp<=0
           ? `<p style="text-align:center;font-weight:800;">¡Victoria! 🏆</p>
@@ -1712,16 +1822,19 @@ body{padding:0;align-items:stretch;}
              <div class="modal-actions"><button class="status-btn action-btn" id="retryFloor">Reintentar</button></div>`)
       : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
         <div class="movegrid">
-          <button data-mv="Ataque">⚔️<br>Ataque</button>
-          <button data-mv="Especial">✨<br>Especial</button>
-          <button data-mv="Defensa">🛡️<br>Defensa</button>
+          <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
+          <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
+          <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
         </div>`}
       <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
     const meCv = document.getElementById('dungeonBattleMe');
-    if(meCv){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet)); useScreenCanvas(); }
+    if(meCv){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet), true); useScreenCanvas(); }
     const monCv = document.getElementById('dungeonBattleMon');
-    if(monCv){ useCanvas(monCv); drawCreature(s.m.sprite); useScreenCanvas(); }
+    if(monCv){ useCanvas(monCv); drawCreature(s.m.sprite, true); useScreenCanvas(); }
+    if(pet.stage>0){
+      startBattleIdle(['dungeonBattleMe','dungeonBattleMon'], ()=>[snapshotVisual(pet), s.m.sprite]);
+    }
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=async ()=>{
@@ -1925,6 +2038,8 @@ body{padding:0;align-items:stretch;}
     const myMoveSet = !!me.move;
     c.innerHTML = `
       <div class="vs">
+        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
+        <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
         <div class="arena-hpbar left"><div class="arena-hpfill" style="width:${Math.max(0,doc.p1.hp)}%"></div></div>
         <div class="arena-hpbar right"><div class="arena-hpfill" style="width:${Math.max(0,doc.p2.hp)}%"></div></div>
         <div class="vs-badge">VS</div>
@@ -1936,16 +2051,20 @@ body{padding:0;align-items:stretch;}
       : myMoveSet ? `<p class="small-note" style="text-align:center;">Esperando el movimiento de ${opp.name}...</p>`
       : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
         <div class="movegrid">
-          <button data-mv="Ataque">⚔️<br>Ataque</button>
-          <button data-mv="Especial">✨<br>Especial</button>
-          <button data-mv="Defensa">🛡️<br>Defensa</button>
+          <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
+          <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
+          <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
         </div>`}
       <div class="battlelog">${(doc.log||[]).slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
     const ob1 = document.getElementById('obCanvas1'), ob2 = document.getElementById('obCanvas2');
-    if(ob1){ useCanvas(ob1); drawCreature({...doc.p1, stage:doc.p1.stage||3, frame:0, sick:false, sleeping:false}); }
-    if(ob2){ useCanvas(ob2); drawCreature({...doc.p2, stage:doc.p2.stage||3, frame:0, sick:false, sleeping:false}); }
+    if(ob1){ useCanvas(ob1); drawCreature({...doc.p1, stage:doc.p1.stage||3, frame:0, sick:false, sleeping:false}, true); }
+    if(ob2){ useCanvas(ob2); drawCreature({...doc.p2, stage:doc.p2.stage||3, frame:0, sick:false, sleeping:false}, true); }
     useScreenCanvas();
+    startBattleIdle(['obCanvas1','obCanvas2'], ()=>[
+      {...doc.p1, stage:doc.p1.stage||3, sick:false, sleeping:false},
+      {...doc.p2, stage:doc.p2.stage||3, sick:false, sleeping:false}
+    ]);
     if(doc.resolvedRound>0 && lastOnlineShakeRound!==doc.resolvedRound){
       lastOnlineShakeRound = doc.resolvedRound;
       const dmg1 = Math.max(0, Math.round(lastOnlineHp.p1 - doc.p1.hp));
@@ -2288,43 +2407,62 @@ body{padding:0;align-items:stretch;}
     const lockedAff = pet.stage>=3 ? pet.affinity : null;
     const avgHappy = pet.ticks ? Math.round(pet.sumHappy/pet.ticks) : pet.happy;
 
-    const branchCard = (label, active, desc)=>`<div class="evo-branch${active?' current':''}"><b>${label}${active?' — actual':''}</b>${desc}</div>`;
-
-    const sendaCard = (key, label, active, desc)=>`
-      <div class="evo-branch${active?' current':''}">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="evo-preview-box"><canvas id="evoPreview_${key}" width="160" height="160"></canvas></div>
-          <div><b>${label}${active?' — actual':''}</b>${desc}</div>
+    const sendaNode = (key, label, active, desc)=>`
+      <div class="efork-branch">
+        <div class="efork-stem"></div>
+        <div class="enode small${active?' current':''}">
+          <div class="evo-preview-box" style="margin:0 auto 4px;"><canvas id="evoPreview_${key}" width="160" height="160"></canvas></div>
+          ${label}<small>${desc}</small>
         </div>
       </div>`;
+    const affChip = (label, active, desc)=>`<span class="evo-branch${active?' current':''}" style="display:inline-block;margin:3px;">${label}${desc}</span>`;
 
     el.innerHTML = `<div class="modal">
       <button class="close-x" id="closeTree">✕</button>
       <h3>ÁRBOL EVOLUTIVO</h3>
-      <p class="small-note">Las formas finales se generan una a una y son prácticamente irrepetibles (nombre, color, silueta, ojos y patrón), pero la ruta para llegar hasta ahí sigue siempre esta estructura. Los sprites son un ejemplo con tu afinidad y temperamento actuales — el tuyo real puede salir distinto.</p>
+      <p class="small-note">Las formas finales son prácticamente irrepetibles (nombre, color, silueta, ojos y patrón), pero la ruta para llegar hasta ahí sigue siempre este árbol. El nodo marcado en verde es hacia donde va tu mascota ahora mismo.</p>
 
-      <div class="evo-stage"><div class="evo-stagetitle">🥚 Huevo</div><div class="evo-gate">Eclosiona solo, con el tiempo</div></div>
-      <div class="evo-stage"><div class="evo-stagetitle">🐣 Cría</div><div class="evo-gate">Sube a Pequeño en el nivel ${LEVEL_CHILD}</div></div>
-      <div class="evo-stage"><div class="evo-stagetitle">🌱 Pequeño</div>
-        <div class="evo-gate">Sube a Joven en el nivel ${LEVEL_ADULT} — aquí se fija el <b>Temperamento</b>:</div>
-        ${branchCard('Activo', trendTemp==='Activo'&&!lockedTemp, '<br>Si has jugado más veces de las que has alimentado.')}
-        ${branchCard('Tranquilo', trendTemp==='Tranquilo'&&!lockedTemp, '<br>Si has alimentado más veces de las que has jugado.')}
-        <div class="evo-trend">${lockedTemp ? 'Ya fijado: '+lockedTemp : 'Tendencia actual: '+trendTemp+' ('+pet.playCount+' jugadas · '+pet.feedCount+' comidas)'}</div>
+      <div class="eflow">
+        <div class="enode">🥚 Huevo</div>
+        <div class="econnector"></div>
+        <div class="enode">🐣 Cría</div>
+        <div class="econnector"></div>
+        <div class="enode${pet.stage===2?' current':''}">🌱 Pequeño<small>sube en el nivel ${LEVEL_CHILD}</small></div>
+
+        <div class="efork">
+          <div class="efork-line"></div>
+          <div class="efork-row">
+            <div class="efork-branch"><div class="efork-stem"></div><div class="enode small${trendTemp==='Activo'&&!lockedTemp?' current':''}${lockedTemp==='Activo'?' current':''}">⚡ Activo<small>juegas más que alimentas</small></div></div>
+            <div class="efork-branch"><div class="efork-stem"></div><div class="enode small${trendTemp==='Tranquilo'&&!lockedTemp?' current':''}${lockedTemp==='Tranquilo'?' current':''}">🌙 Tranquilo<small>alimentas más que juegas</small></div></div>
+          </div>
+        </div>
+        <div class="evo-trend" style="text-align:center;">${lockedTemp ? 'Ya fijado: '+lockedTemp : 'Tendencia: '+trendTemp+' ('+pet.playCount+' jugadas · '+pet.feedCount+' comidas)'}</div>
+
+        <div class="econnector"></div>
+        <div class="enode${pet.stage>=3?' current':''}">✨ Joven<small>sube en el nivel ${LEVEL_ADULT} — nace tu especie única</small></div>
+
+        <div class="efork">
+          <div class="efork-line"></div>
+          <div class="efork-row three">
+            ${sendaNode('luz','Luz', trendPath==='luz'&&!lockedPath||lockedPath==='luz', 'ánimo alto, pocos fallos')}
+            ${sendaNode('sombra','Sombra', trendPath==='sombra'&&!lockedPath||lockedPath==='sombra', 'muchos fallos o ánimo bajo')}
+            ${sendaNode('equilibrio','Equilibrio', trendPath==='equilibrio'&&!lockedPath||lockedPath==='equilibrio', 'término medio')}
+          </div>
+        </div>
+        <div class="evo-trend" style="text-align:center;">${lockedPath ? 'Ya fijada: '+PATH_LABEL[lockedPath] : 'Tendencia: '+PATH_LABEL[trendPath]+' ('+pet.mistakes+' fallos · '+avgHappy+'% ánimo medio)'}</div>
+
+        <div class="evo-gate" style="text-align:center;margin-top:10px;"><b>Afinidad</b> (tu stat más alto ahora mismo) — cruza con la Senda para decidir forma y rasgo:</div>
+        <div style="text-align:center;">
+          ${STAT_KEYS.map(k=>affChip(STAT_LABEL[k], (trendAff===k&&!lockedAff)||lockedAff===k, ' '+pet.stats[k]+'pt')).join('')}
+          ${affChip('Equilibrado', (trendAff==='equilibrado'&&!lockedAff)||lockedAff==='equilibrado', '')}
+        </div>
+        <p class="small-note">También se generan al azar: el tono de color (de 360 posibles), los ojos y el patrón — dos mascotas con tu misma Senda y Afinidad no se verán iguales.</p>
+
+        <div class="econnector"></div>
+        <div class="enode${pet.stage===4?' current':''}">💠 Perfecto<small>misma especie, forma Mayor — nivel ${LEVEL_PERFECT}</small></div>
+        <div class="econnector"></div>
+        <div class="enode${pet.stage===5?' current':''}">🌟 Supremo<small>misma especie, forma Suprema — nivel ${LEVEL_ULTIMATE}</small></div>
       </div>
-      <div class="evo-stage"><div class="evo-stagetitle">✨ Joven — aquí nace tu especie única</div>
-        <div class="evo-gate"><b>Senda</b> (según cómo la cuidas) — así se vería un ejemplo de cada una con tu afinidad actual:</div>
-        ${sendaCard('luz','Luz', trendPath==='luz'&&!lockedPath, '<br>Pocos fallos de cuidado y ánimo alto de media.')}
-        ${sendaCard('sombra','Sombra', trendPath==='sombra'&&!lockedPath, '<br>Muchos fallos de cuidado, o ánimo bajo de media.')}
-        ${sendaCard('equilibrio','Equilibrio', trendPath==='equilibrio'&&!lockedPath, '<br>Un término medio entre las dos anteriores.')}
-        <div class="evo-trend">${lockedPath ? 'Ya fijada: '+PATH_LABEL[lockedPath] : 'Tendencia actual: '+PATH_LABEL[trendPath]+' ('+pet.mistakes+' fallos · '+avgHappy+'% ánimo medio)'}</div>
-        <div class="evo-gate" style="margin-top:12px;"><b>Afinidad</b> (tu stat más alto ahora mismo):</div>
-        ${STAT_KEYS.map(k=>branchCard(STAT_LABEL[k], trendAff===k&&!lockedAff, ' — '+pet.stats[k]+' puntos')).join('')}
-        ${branchCard('Equilibrado', trendAff==='equilibrado'&&!lockedAff, '<br>Si dos o más stats están empatados en el más alto.')}
-        <div class="evo-trend">${lockedAff ? 'Ya fijada: '+(STAT_LABEL[lockedAff]||'Equilibrado') : 'Tendencia actual: '+(STAT_LABEL[trendAff]||'Equilibrado')}</div>
-        <p class="small-note">Con la Senda + la Afinidad se genera al azar: el nombre, el tono de color (de 360 posibles), la forma del cuerpo, el tipo de rasgo (alas/cuernos/orejas/aletas/antenas/púas), el estilo de ojos y el patrón — así que aunque otro jugador tenga tu misma Senda y Afinidad, su mascota no se verá igual que la tuya.</p>
-      </div>
-      <div class="evo-stage"><div class="evo-stagetitle">💠 Perfecto</div><div class="evo-gate">Misma especie, forma Mayor — nivel ${LEVEL_PERFECT}</div></div>
-      <div class="evo-stage" style="border-left-color:transparent;"><div class="evo-stagetitle">🌟 Supremo</div><div class="evo-gate">Misma especie, forma Suprema — nivel ${LEVEL_ULTIMATE}</div></div>
 
       ${pet.stage>=3 ? `<h3 style="margin-top:18px;">TU FORMA ACTUAL</h3>
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
