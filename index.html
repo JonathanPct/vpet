@@ -747,15 +747,18 @@ body{padding:0;align-items:stretch;}
     };
   }
   const SYLLABLES = {
-    luz:        ['Ae','Vel','Ser','Lir','Or','Wyn','Ith','Cel','Ael','Nyra','Sol','Ily'],
-    sombra:     ['Fang','Grim','Vex','Drak','Nox','Krev','Zhul','Morg','Ash','Rax','Vor','Sker'],
-    equilibrio: ['Tan','Kai','Doro','Bal','Sen','Mira','Tazu','Ren','Vio','Tol','Nim','Quor']
+    luz:        ['Ae','Vel','Ser','Lir','Or','Wyn','Ith','Cel','Ael','Nyra','Sol','Ily','Rael','Thi','Aur','Ely','Isha','Vyn','Lume','Sael','Ori','Fael','Anth','Ysel'],
+    sombra:     ['Fang','Grim','Vex','Drak','Nox','Krev','Zhul','Morg','Ash','Rax','Vor','Sker','Thal','Grath','Nyx','Vash','Krul','Dorn','Skarr','Vrax','Molg','Thra','Grix','Naz'],
+    equilibrio: ['Tan','Kai','Doro','Bal','Sen','Mira','Tazu','Ren','Vio','Tol','Nim','Quor','Yuma','Sora','Vael','Kesh','Dana','Rilo','Ambe','Tovi','Sael','Nira','Kelo','Wenda']
   };
   function proceduralName(path, temperament, seed){
     const rand = mulberry32(seed);
     const pool = SYLLABLES[path];
     const preferLong = temperament==='Tranquilo';
-    const count = rand() < (preferLong ? 0.4 : 0.7) ? 2 : 3;
+    const roll = rand();
+    let count;
+    if(preferLong){ count = roll<0.1?2:(roll<0.55?3:4); }
+    else{ count = roll<0.2?2:(roll<0.7?3:4); }
     let parts=[], last=null;
     for(let i=0;i<count;i++){
       let s;
@@ -785,8 +788,8 @@ body{padding:0;align-items:stretch;}
       hue: Math.floor(rand()*360),
       bodyShape: weightedPick(rand, EVO_SHAPE_OPTS, w.shape),
       featureType: weightedPick(rand, EVO_FEAT_OPTS, w.feat),
-      eyeStyle: ['redondos','rasgados','ciclope','trio'][Math.floor(rand()*4)],
-      pattern: ['liso','manchas','rayas','estrellado'][Math.floor(rand()*4)],
+      eyeStyle: EVO_EYE_OPTS[Math.floor(rand()*EVO_EYE_OPTS.length)],
+      pattern: EVO_PATTERN_OPTS[Math.floor(rand()*EVO_PATTERN_OPTS.length)],
       bgSeed: seed+999
     };
   }
@@ -906,8 +909,8 @@ body{padding:0;align-items:stretch;}
       const w = AFFINITY_WEIGHTS[pet.affinity] || AFFINITY_WEIGHTS.equilibrado;
       pet.bodyShape = weightedPick(rand2, EVO_SHAPE_OPTS, w.shape);
       pet.featureType = weightedPick(rand2, EVO_FEAT_OPTS, w.feat);
-      pet.eyeStyle = ['redondos','rasgados','ciclope','trio'][Math.floor(rand2()*4)];
-      pet.pattern = ['liso','manchas','rayas','estrellado'][Math.floor(rand2()*4)];
+      pet.eyeStyle = EVO_EYE_OPTS[Math.floor(rand2()*EVO_EYE_OPTS.length)];
+      pet.pattern = EVO_PATTERN_OPTS[Math.floor(rand2()*EVO_PATTERN_OPTS.length)];
       pet.stage=3;
       const post = snapshotVisual(pet);
       sfx('evolve');
@@ -984,15 +987,17 @@ body{padding:0;align-items:stretch;}
   }
 
   const STAT_KEYS = ['atq','def','mag','res','vel'];
-  const EVO_SHAPE_OPTS = ['redondo','anguloso','alargado','compacto'];
-  const EVO_FEAT_OPTS = ['alas','cuernos','orejas','aletas','antenas','pinchos'];
+  const EVO_SHAPE_OPTS = ['redondo','anguloso','alargado','compacto','esbelto','macizo','ovalado','triangular'];
+  const EVO_FEAT_OPTS = ['alas','cuernos','orejas','aletas','antenas','pinchos','espinas','cresta','cola','caparazon'];
+  const EVO_EYE_OPTS = ['redondos','rasgados','ciclope','trio','dormidos','brillantes'];
+  const EVO_PATTERN_OPTS = ['liso','manchas','rayas','estrellado','degradado','geometrico'];
   const AFFINITY_WEIGHTS = {
-    atq:        { shape:[1,2.2,0.6,1.6], feat:[0.5,2.2,0.8,1,0.5,2] },
-    def:        { shape:[1.4,0.8,0.5,2.2], feat:[0.5,1,2,2,0.5,1.4] },
-    mag:        { shape:[1.6,0.5,2,0.6], feat:[2.2,0.5,0.8,0.6,2.2,0.5] },
-    res:        { shape:[2,0.6,0.8,1.4], feat:[1.4,0.6,2.2,1,1,0.6] },
-    vel:        { shape:[1,0.6,2.2,0.8], feat:[2,0.5,0.6,1.4,2,0.5] },
-    equilibrado:{ shape:[1,1,1,1], feat:[1,1,1,1,1,1] }
+    atq:        { shape:[0.8,1.5,0.8,1.2,0.8,1.5,0.9,1.6], feat:[0.6,1.6,0.8,0.9,0.6,1.6,1.5,0.7,0.9,0.6] },
+    def:        { shape:[1.1,0.9,0.7,1.6,0.7,1.5,1.0,0.8], feat:[0.6,0.9,1.5,1.5,0.6,1.0,1.4,0.8,0.7,1.7] },
+    mag:        { shape:[1.2,0.7,1.5,0.7,1.5,0.7,1.2,0.7], feat:[1.6,0.6,0.8,0.7,1.6,0.6,0.7,1.4,0.8,0.6] },
+    res:        { shape:[1.5,0.8,0.9,1.4,0.8,1.1,1.2,0.7], feat:[1.0,0.7,1.6,1.0,0.9,0.7,1.0,1.5,0.7,1.6] },
+    vel:        { shape:[0.9,0.7,1.5,0.7,1.6,0.7,1.0,1.3], feat:[1.5,0.6,0.7,1.2,1.5,0.6,0.7,1.0,1.6,0.6] },
+    equilibrado:{ shape:[1,1,1,1,1,1,1,1], feat:[1,1,1,1,1,1,1,1,1,1] }
   };
   const STAT_LABEL = {atq:'Ataque', def:'Defensa', mag:'Magia', res:'Resistencia', vel:'Velocidad'};
   function gainXp(amount){
@@ -1181,6 +1186,10 @@ body{padding:0;align-items:stretch;}
       if(shape==='anguloso'){ rx*=0.92; ry*=1.08; }
       else if(shape==='alargado'){ rx*=0.8; ry*=1.28; }
       else if(shape==='compacto'){ rx*=1.18; ry*=0.82; }
+      else if(shape==='esbelto'){ rx*=0.7; ry*=1.4; }
+      else if(shape==='macizo'){ rx*=1.32; ry*=0.72; }
+      else if(shape==='ovalado'){ rx*=0.88; ry*=1.16; }
+      else if(shape==='triangular'){ rx*=1.05; ry*=0.95; }
     }
     const pal = palette(stage, pet.hue);
     const bob = (frame%8<4)?0:0.4;
@@ -1202,6 +1211,10 @@ body{padding:0;align-items:stretch;}
       else if(feat==='aletas') drawFins(cx,bcy,rx,ry,featScale,pal.accent);
       else if(feat==='antenas') drawAntennas(cx,bcy,rx,ry,featScale,pal.accent);
       else if(feat==='pinchos') drawSpikes(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='espinas') drawEspinas(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='cresta') drawCresta(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='cola') drawCola(cx,bcy,rx,ry,featScale,pal.accent);
+      else if(feat==='caparazon') drawCaparazon(cx,bcy,rx,ry,featScale,pal.accent);
     }
 
     // el cuerpo
@@ -1260,6 +1273,14 @@ body{padding:0;align-items:stretch;}
         px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
         px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
         px(cx-0.5,eyeY+ry*0.35,'#1a2620',1.0,eh*0.7);
+      } else if(eyeStyle==='dormidos'){
+        px(cx-eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
+        px(cx+eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
+      } else if(eyeStyle==='brillantes'){
+        px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+        px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+        px(cx-eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
+        px(cx+eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
       } else {
         px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
         px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
@@ -1325,6 +1346,32 @@ body{padding:0;align-items:stretch;}
       px(gx, cy-ry-s*(1-i*0.15), color, s*0.7, s*(1+i*0.15));
     }
   }
+  function drawEspinas(cx,cy,rx,ry,scale,color){
+    const n=5, s=1.1*scale;
+    for(let i=0;i<n;i++){
+      const t = i/(n-1);
+      const gx = cx - rx*0.6 + t*rx*1.2;
+      const gy = cy - ry*(0.9 - Math.sin(t*Math.PI)*0.35);
+      px(gx, gy, color, s*0.55, s*0.9);
+    }
+  }
+  function drawCresta(cx,cy,rx,ry,scale,color){
+    const h = 3.4*scale;
+    px(cx-0.9,cy-ry-h*0.4,color,1.8,h*0.6);
+    px(cx-0.6,cy-ry-h*0.75,color,1.2,h*0.5);
+    px(cx-0.3,cy-ry-h,color,0.8,h*0.4);
+  }
+  function drawCola(cx,cy,rx,ry,scale,color){
+    const len = 2.6*scale;
+    px(cx+rx*0.65, cy+ry*0.35, color, len*0.9, 1.1*scale);
+    px(cx+rx*0.65+len*0.7, cy+ry*0.15, color, len*0.6, 0.9*scale);
+    px(cx+rx*0.65+len*1.2, cy-ry*0.05, color, 1.3*scale, 1.3*scale);
+  }
+  function drawCaparazon(cx,cy,rx,ry,scale,color){
+    const w = rx*1.15*scale/1.2, h = 2.2*scale;
+    px(cx-w*0.5, cy-ry-h*0.3, color, w, h*0.6);
+    px(cx-w*0.35, cy-ry-h*0.6, color, w*0.7, h*0.4);
+  }
   function drawPattern(cx,cy,rx,ry,pattern,color){
     if(pattern==='manchas'){
       const spots=[[cx-rx*0.35,cy-ry*0.15],[cx+rx*0.3,cy-ry*0.3],[cx-rx*0.1,cy+ry*0.3],[cx+rx*0.35,cy+ry*0.05]];
@@ -1334,6 +1381,11 @@ body{padding:0;align-items:stretch;}
     } else if(pattern==='estrellado'){
       const flecks=[[cx-rx*0.5,cy-ry*0.4],[cx+rx*0.2,cy-ry*0.55],[cx-rx*0.2,cy+ry*0.1],[cx+rx*0.45,cy+ry*0.25],[cx-rx*0.05,cy-ry*0.05],[cx+rx*0.05,cy+ry*0.45]];
       flecks.forEach(([gx,gy])=>px(gx,gy,color,0.5,0.5));
+    } else if(pattern==='degradado'){
+      px(cx-rx*0.55, cy+ry*0.1, color, rx*1.1, ry*0.22);
+    } else if(pattern==='geometrico'){
+      const pts=[[cx,cy-ry*0.5],[cx+rx*0.4,cy],[cx,cy+ry*0.5],[cx-rx*0.4,cy]];
+      pts.forEach(([gx,gy])=>px(gx,gy,color,0.9,0.9));
     }
   }
 
