@@ -423,7 +423,7 @@ body{padding:0;align-items:stretch;}
 }
 .screen-bezel::before{display:none;}
 .screen-inner{position:fixed;inset:0;border-radius:0;}
-#screen{position:fixed;inset:0;width:100vw;height:100dvh;object-fit:cover;}
+#screen{position:fixed;inset:0;width:100vw;height:100dvh;object-fit:contain;background:var(--screen);}
 
 .topbar{
   position:fixed;top:0;left:0;right:0;z-index:20;margin:0;
@@ -1043,14 +1043,14 @@ body{padding:0;align-items:stretch;}
         const isLetargo = pet.energy<=5;
         const isRacha = pet.sac>60 && pet.happy>60 && pet.hyg>60 && pet.health>=80;
 
-        // el hambre y el ánimo casi no bajan: solo se mueven de verdad cada 3 turnos
-        if(pet.ticks % 3 === 0 || isLetargo){
+        // el hambre y el ánimo casi no bajan: pensado para que una barra llena aguante varias horas reales
+        if(pet.ticks % 60 === 0 || isLetargo){
           const sacDecay = 1 + (isLetargo?2:0);
           const happyDecay = 1 + (isEmpacho?2:0) + (isLetargo?1:0) - (isRacha?3:0);
           pet.sac = clamp(pet.sac - sacDecay);
           pet.happy = clamp(pet.happy - happyDecay);
         }
-        if(pet.ticks % 2 === 0){ pet.energy = clamp(pet.energy - 1); }
+        if(pet.ticks % 30 === 0){ pet.energy = clamp(pet.energy - 1); }
         if(isRacha){ pet.health = clamp(pet.health + 2); }
         if(pet.empachoTicks>0){ pet.empachoTicks--; }
 
@@ -1432,6 +1432,30 @@ body{padding:0;align-items:stretch;}
   function refreshScrollLock(){
     const has = document.getElementById('modalRoot').children.length>0;
     document.body.style.overflow = has ? 'hidden' : '';
+  }
+
+  // en el APK, el botón "atrás" de Android dispara un popstate; si tengo un menú abierto,
+  // lo cierro yo en vez de dejar que el sistema se salga de la app entera
+  window.addEventListener('popstate', ()=>{
+    const modalRoot = document.getElementById('modalRoot');
+    if(modalRoot.children.length>0){
+      stopBattlePoll(); stopBattleIdle(); stopMinigameTimers();
+      modalRoot.lastElementChild.remove();
+      refreshScrollLock();
+    }
+  });
+  const modalBackObserver = new MutationObserver((mutations)=>{
+    mutations.forEach(m=>{
+      if(m.addedNodes && m.addedNodes.length>0){ history.pushState({modal:true}, ''); }
+    });
+  });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const modalRoot = document.getElementById('modalRoot');
+    if(modalRoot) modalBackObserver.observe(modalRoot, {childList:true});
+  });
+  if(document.readyState!=='loading'){
+    const modalRoot = document.getElementById('modalRoot');
+    if(modalRoot) modalBackObserver.observe(modalRoot, {childList:true});
   }
 
   function renderGameOver(){
