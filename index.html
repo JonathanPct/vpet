@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BYTEMON — Tu mascota digital</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f1640">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
 <!-- Solo necesito esto si subo el archivo fuera de Claude (ver mis notas al final del código) -->
@@ -816,6 +823,7 @@ body{padding:0;align-items:stretch;}
       level:1, xp:0, xpNext:10, stats:{atq:5, def:5, mag:5, res:5, vel:5}, affinity:null,
       bgSeed: Math.floor(Math.random()*4294967295),
       dungeonFloor:1, dungeonDefeated:[],
+      notifsOn:false, notifiedHungerLow:false,
       lastSaved: Date.now(), frame:0
     };
   }
@@ -857,6 +865,21 @@ body{padding:0;align-items:stretch;}
     t.classList.add('show');
     clearTimeout(showToast._h);
     showToast._h = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  function sendHungerNotification(){
+    if(!pet.notifsOn) return;
+    if(!('Notification' in window) || Notification.permission!=='granted') return;
+    if(!document.hidden) return; // si estoy mirando la app ahora mismo, ya lo veo en pantalla, no hace falta el aviso
+    const body = pet.name+' tiene hambre — dale de comer 🍖';
+    if(navigator.serviceWorker && navigator.serviceWorker.ready){
+      navigator.serviceWorker.ready.then(reg=>{
+        if(reg && reg.showNotification) reg.showNotification('BYTEMON', {body, icon:'icon-192.png', tag:'hambre'});
+        else new Notification('BYTEMON', {body});
+      }).catch(()=>{ try{ new Notification('BYTEMON', {body}); }catch(e){} });
+    } else {
+      try{ new Notification('BYTEMON', {body}); }catch(e){}
+    }
   }
 
   function computePath(){
@@ -1049,6 +1072,11 @@ body{padding:0;align-items:stretch;}
           const happyDecay = 1 + (isEmpacho?2:0) + (isLetargo?1:0) - (isRacha?3:0);
           pet.sac = clamp(pet.sac - sacDecay);
           pet.happy = clamp(pet.happy - happyDecay);
+          if(pet.sac<=20 && !pet.notifiedHungerLow){
+            pet.notifiedHungerLow = true;
+            sendHungerNotification();
+          }
+          if(pet.sac>35){ pet.notifiedHungerLow = false; }
         }
         if(pet.ticks % 30 === 0){ pet.energy = clamp(pet.energy - 1); }
         if(isRacha){ pet.health = clamp(pet.health + 2); }
@@ -2457,7 +2485,9 @@ body{padding:0;align-items:stretch;}
         <button class="status-btn" id="moreBattle">⚔️ Batalla</button>
         <button class="status-btn" id="moreGames">🎲 Minijuegos</button>
         <button class="status-btn" id="moreTree">🌳 Árbol evolutivo</button>
+        <button class="status-btn" id="moreNotifs">${pet.notifsOn ? '🔔 Avisos de hambre: ON' : '🔕 Avisos de hambre: OFF'}</button>
       </div>
+      <p class="small-note">Los avisos solo funcionan si tienes la app abierta o recién minimizada — Android puede cerrarla del todo tras un rato y entonces no llegan.</p>
       <div class="footnote">Cada usuario que abra este VPET tiene su propia mascota guardada — es personal e independiente.</div>
     </div>`;
     document.getElementById('modalRoot').appendChild(el);
@@ -2470,6 +2500,20 @@ body{padding:0;align-items:stretch;}
     document.getElementById('moreBattle').onclick = ()=>{ close(); openBattleModal(); };
     document.getElementById('moreGames').onclick = ()=>{ close(); openGamesModal(); };
     document.getElementById('moreTree').onclick = ()=>{ close(); openTreeModal(); };
+    document.getElementById('moreNotifs').onclick = async ()=>{
+      sfx('tap');
+      if(!pet.notifsOn){
+        if(!('Notification' in window)){ showToast('Tu navegador no soporta avisos'); return; }
+        const perm = await Notification.requestPermission();
+        if(perm!=='granted'){ showToast('No has dado permiso de avisos'); return; }
+        pet.notifsOn = true;
+      } else {
+        pet.notifsOn = false;
+      }
+      savePet();
+      close();
+      showToast(pet.notifsOn ? 'Avisos de hambre activados 🔔' : 'Avisos de hambre desactivados');
+    };
   }
   document.getElementById('btnMore').onclick = openMoreMenu;
   function openTreeModal(){
@@ -2583,6 +2627,14 @@ body{padding:0;align-items:stretch;}
     setInterval(()=>{ if(pet.alive && pet.stage>0){ render(); } }, 550); // idle animation refresh
   });
 })();
+</script>
+<script>
+  // registro mi service worker, así la app se puede instalar de verdad (lo necesito para el APK)
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{ /* si falla, la app sigue funcionando igual, solo sin caché offline */ });
+    });
+  }
 </script>
 </body>
 </html>
