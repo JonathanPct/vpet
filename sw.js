@@ -1,7 +1,7 @@
 // mi service worker: guardo en caché lo básico para que la app abra sin conexión
 // y para que cuente como PWA instalable de verdad (PWABuilder lo necesita)
 const CACHE_NAME = 'bytemon-cache-v1';
-const APP_SHELL = ['./index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const APP_SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
