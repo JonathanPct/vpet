@@ -203,19 +203,24 @@
   .home-btn{
     position:relative;overflow:visible;
     border-radius:50%;aspect-ratio:1/1;width:100%;
-    background:radial-gradient(circle at 35% 28%, rgba(255,255,255,.18), transparent 55%), var(--btnglow,#4a3d6b);
+    background:radial-gradient(circle at 35% 28%, rgba(255,255,255,.22), transparent 55%), var(--btnglow,#4a3d6b);
     border:none;
-    box-shadow:0 6px 14px rgba(0,0,0,.4), 0 0 0 3px rgba(255,255,255,.06), inset 0 2px 4px rgba(255,255,255,.15), inset 0 -6px 10px rgba(0,0,0,.25);
+    box-shadow:0 8px 16px rgba(0,0,0,.45), 0 0 0 3px rgba(255,255,255,.07), inset 0 2px 4px rgba(255,255,255,.18), inset 0 -7px 11px rgba(0,0,0,.28);
     display:flex;align-items:center;justify-content:center;padding:0;
   }
-  .home-btn::before{display:none;}
-  .home-btn .ico{font-size:26px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));}
+  .home-btn::before{
+    display:block;content:'';position:absolute;inset:-5px;border-radius:50%;z-index:-1;
+    background:var(--btnglow,#4a3d6b);opacity:.35;filter:blur(7px);
+    animation:homeGlowPulse 3.2s ease-in-out infinite;
+  }
+  @keyframes homeGlowPulse{0%,100%{opacity:.22;transform:scale(1);} 50%{opacity:.5;transform:scale(1.08);}}
+  .home-btn .ico{font-size:27px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45));}
   .home-btn .home-label{
-    position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:7px;
+    position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:8px;
     font-family:'Nunito',sans-serif;font-weight:800;font-size:10.5px;color:var(--ink);
     white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.6);
   }
-  .home-btn:active{transform:translateY(2px) scale(.95);}
+  .home-btn:active{transform:translateY(2px) scale(.94);}
   #btnFeed.home-btn{--btnglow:linear-gradient(160deg,#ffb84d,#c4791e);}
   #btnPlay.home-btn{--btnglow:linear-gradient(160deg,#ff8fd0,#c4368f);}
   #btnClean.home-btn{--btnglow:linear-gradient(160deg,#5ed6ff,#1e8fc4);}
@@ -366,6 +371,11 @@
   .evo-trend{font-size:11px;color:var(--luz);margin-top:6px;margin-bottom:4px;font-weight:700;}
   .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-left:6px;}
   .evo-preview-box{width:52px;height:52px;flex-shrink:0;border-radius:8px;overflow:hidden;background:#0a1712;border:1px solid rgba(157,77,255,.3);}
+  .evo-choice-row{display:flex;gap:8px;margin-top:14px;}
+  .evo-choice-card{flex:1;text-align:center;padding:10px 4px;border-radius:12px;cursor:pointer;
+    background:rgba(157,77,255,.08);border:1px solid rgba(157,77,255,.25);}
+  .evo-choice-card:active{transform:scale(.96);}
+  .evo-choice-card b{display:block;font-size:11px;margin-top:2px;}
   .evo-preview-box canvas{width:100%;height:100%;image-rendering:pixelated;display:block;}
   .eflow{display:flex;flex-direction:column;align-items:center;}
   .enode{background:rgba(157,77,255,.08);border:1px solid rgba(157,77,255,.3);border-radius:10px;
@@ -430,7 +440,7 @@ body{padding:0;align-items:stretch;}
 }
 .screen-bezel::before{display:none;}
 .screen-inner{position:fixed;inset:0;border-radius:0;}
-#screen{position:fixed;inset:0;width:100vw;height:100dvh;object-fit:contain;background:var(--screen);}
+#screen{position:fixed;inset:0;width:100vw;height:100dvh;object-fit:cover;background:var(--screen);}
 
 .topbar{
   position:fixed;top:0;left:0;right:0;z-index:20;margin:0;
@@ -686,16 +696,30 @@ body{padding:0;align-items:stretch;}
 
   const STORAGE_KEY = 'bytemon:pet';
   const GRID = 24;
+  const CELL_PX = 20;
   const screenCanvas = document.getElementById('screen');
   let canvas = screenCanvas;
   let ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   let cell = canvas.width / GRID;
   let cinematicActive = false;
+  function resizeScreenCanvas(){
+    // ajusto la altura del lienzo a la proporción real de la pantalla, así no me quedan bandas negras arriba/abajo
+    const aspect = window.innerHeight / window.innerWidth;
+    screenCanvas.width = GRID * CELL_PX;
+    screenCanvas.height = Math.max(screenCanvas.width, Math.round(GRID * CELL_PX * aspect));
+    if(canvas === screenCanvas){ cell = screenCanvas.width / GRID; }
+  }
+  resizeScreenCanvas();
   function useCanvas(c){
     canvas = c; ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false; cell = c.width / GRID;
   }
   function useScreenCanvas(){ useCanvas(screenCanvas); }
+  let screenResizeT;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(screenResizeT);
+    screenResizeT = setTimeout(()=>{ resizeScreenCanvas(); if(hasLoaded) render(); }, 200);
+  });
 
   // ---------- mis sonidos, los genero yo mismo con osciladores (nada de archivos de audio) ----------
   let audioCtx = null;
@@ -904,6 +928,74 @@ body{padding:0;align-items:stretch;}
       hue:p.hue, bodyShape:p.bodyShape, featureType:p.featureType, eyeStyle:p.eyeStyle, pattern:p.pattern, bgSeed:p.bgSeed};
   }
 
+  let evolutionChoicePending = false;
+  function generateCandidate(path, temperament){
+    const seed = Math.floor(Math.random()*4294967295);
+    const rand2 = mulberry32(seed+1);
+    const affinity = computeAffinity();
+    const w = AFFINITY_WEIGHTS[affinity] || AFFINITY_WEIGHTS.equilibrado;
+    return {
+      speciesSeed: seed,
+      speciesName: proceduralName(path, temperament, seed),
+      affinity,
+      hue: Math.floor(rand2()*360),
+      bodyShape: weightedPick(rand2, EVO_SHAPE_OPTS, w.shape),
+      featureType: weightedPick(rand2, EVO_FEAT_OPTS, w.feat),
+      eyeStyle: EVO_EYE_OPTS[Math.floor(rand2()*EVO_EYE_OPTS.length)],
+      pattern: EVO_PATTERN_OPTS[Math.floor(rand2()*EVO_PATTERN_OPTS.length)]
+    };
+  }
+
+  function openEvolutionChoiceModal(path, temperament){
+    const candidates = [generateCandidate(path,temperament), generateCandidate(path,temperament), generateCandidate(path,temperament)];
+    const el = document.createElement('div');
+    el.className='modal-backdrop'; el.id='evoChoiceModal';
+    el.innerHTML = `<div class="modal">
+      <h3>ELIGE SU EVOLUCIÓN</h3>
+      <p class="small-note">${pet.name} puede convertirse en cualquiera de estas tres — elige la que más te guste, es para siempre.</p>
+      <div class="evo-choice-row">
+        ${candidates.map((c,i)=>`
+          <div class="evo-choice-card" data-idx="${i}">
+            <div class="evo-preview-box" style="width:72px;height:72px;margin:0 auto 6px;"><canvas id="evoChoiceCv${i}" width="200" height="200"></canvas></div>
+            <b>${c.speciesName}</b>
+          </div>`).join('')}
+      </div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    refreshScrollLock();
+    candidates.forEach((c,i)=>{
+      const cv = document.getElementById('evoChoiceCv'+i);
+      useCanvas(cv);
+      drawCreature({stage:3, frame:0, sick:false, sleeping:false, temperament, path,
+        hue:c.hue, bodyShape:c.bodyShape, featureType:c.featureType, eyeStyle:c.eyeStyle, pattern:c.pattern, bgSeed:pet.bgSeed});
+    });
+    useScreenCanvas();
+    el.querySelectorAll('.evo-choice-card').forEach(card=>{
+      card.onclick = ()=>{
+        sfx('tap');
+        const c = candidates[parseInt(card.getAttribute('data-idx'),10)];
+        const pre = snapshotVisual(pet);
+        pet.path = path;
+        pet.affinity = c.affinity;
+        pet.speciesSeed = c.speciesSeed;
+        pet.speciesName = c.speciesName;
+        pet.hue = c.hue;
+        pet.bodyShape = c.bodyShape;
+        pet.featureType = c.featureType;
+        pet.eyeStyle = c.eyeStyle;
+        pet.pattern = c.pattern;
+        pet.stage = 3;
+        const post = snapshotVisual(pet);
+        el.remove();
+        refreshScrollLock();
+        evolutionChoicePending = false;
+        sfx('evolve');
+        playEvolutionCinematic(pre, post, '¡Digievolución!', pet.speciesName+' — '+PATH_LABEL[pet.path]);
+        savePet();
+      };
+    });
+  }
+
   function checkEvolution(){
     if(pet.stage===0 && pet.age>=AGE_HATCH){
       const pre = snapshotVisual(pet);
@@ -920,24 +1012,10 @@ body{padding:0;align-items:stretch;}
       sfx('evolve');
       playEvolutionCinematic(pre, post, '¡Evolución!', pet.name+' ha crecido — temperamento '+pet.temperament);
     }
-    else if(pet.stage===2 && pet.level>=LEVEL_ADULT){
-      const pre = snapshotVisual(pet);
-      pet.path = computePath();
-      pet.affinity = computeAffinity();
-      pet.speciesSeed = Math.floor(Math.random()*4294967295);
-      pet.speciesName = proceduralName(pet.path, pet.temperament, pet.speciesSeed);
-      const rand2 = mulberry32(pet.speciesSeed+1);
-      pet.hue = Math.floor(rand2()*360);
-
-      const w = AFFINITY_WEIGHTS[pet.affinity] || AFFINITY_WEIGHTS.equilibrado;
-      pet.bodyShape = weightedPick(rand2, EVO_SHAPE_OPTS, w.shape);
-      pet.featureType = weightedPick(rand2, EVO_FEAT_OPTS, w.feat);
-      pet.eyeStyle = EVO_EYE_OPTS[Math.floor(rand2()*EVO_EYE_OPTS.length)];
-      pet.pattern = EVO_PATTERN_OPTS[Math.floor(rand2()*EVO_PATTERN_OPTS.length)];
-      pet.stage=3;
-      const post = snapshotVisual(pet);
-      sfx('evolve');
-      playEvolutionCinematic(pre, post, '¡Digievolución!', pet.speciesName+' — '+PATH_LABEL[pet.path]);
+    else if(pet.stage===2 && pet.level>=LEVEL_ADULT && !evolutionChoicePending){
+      evolutionChoicePending = true;
+      const path = computePath();
+      openEvolutionChoiceModal(path, pet.temperament);
     }
     else if(pet.stage===3 && pet.level>=LEVEL_PERFECT){
       const pre = snapshotVisual(pet);
@@ -1186,7 +1264,7 @@ body{padding:0;align-items:stretch;}
   }
 
   function drawEgg(frame, bgSeed){
-    const cx=12, cy=13;
+    const cx=12, cy=(canvas.height/cell)/2;
     drawSceneBackground(bgSeed);
     const cells = ellipseCells(cx,cy,5.2,6.6);
     cells.forEach(([gx,gy])=>px(gx,gy,'#fff3d6'));
@@ -1206,7 +1284,7 @@ body{padding:0;align-items:stretch;}
     const {stage, frame, sick, sleeping, temperament} = pet;
     if(transparent){ ctx.clearRect(0,0,canvas.width,canvas.height); }
     else { drawSceneBackground(pet.bgSeed); }
-    const cx=12, cy=13.5;
+    const cx=12, cy=transparent ? 13.5 : (canvas.height/cell)/2;
     const sizes = {1:[4.6,4.2],2:[5.6,5.0],3:[6.8,6.2],4:[7.8,7.2],5:[8.8,8.2]};
     let [rx,ry] = sizes[stage];
     if(stage>=3){
@@ -1853,6 +1931,7 @@ body{padding:0;align-items:stretch;}
     const rew = dungeonRewards(monster);
     const defeated = (pet.dungeonDefeated||[]).filter(f=>f!==pet.dungeonFloor);
     c.innerHTML = `
+      <div class="modal-actions"><button class="status-btn action-btn" id="dgViewStats">📊 Ver mis stats</button></div>
       <p class="small-note" style="text-align:center;">Gana combates para subir de piso. Cuanto más nivel tengas, menos te dará cada combate.</p>
       <div class="vs">
         <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
@@ -1883,6 +1962,7 @@ body{padding:0;align-items:stretch;}
         </div>` : ''}
     `;
     document.getElementById('startDungeon').onclick = ()=>{ sfx('tap'); startDungeonBattle(monster); };
+    document.getElementById('dgViewStats').onclick = ()=>{ sfx('tap'); openInfoModal(); };
     const meCv = document.getElementById('dungeonPreviewMe');
     if(pet.stage>0){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet), true); useScreenCanvas(); }
     const monCv = document.getElementById('dungeonPreviewMon');
@@ -1910,6 +1990,7 @@ body{padding:0;align-items:stretch;}
     if(!s) return;
     const finished = s.p1.hp<=0 || s.m.hp<=0;
     c.innerHTML = `
+      <div class="modal-actions"><button class="status-btn action-btn" id="dgViewStats2">📊 Ver mis stats</button></div>
       <div class="vs">
         <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
         <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
@@ -1921,7 +2002,8 @@ body{padding:0;align-items:stretch;}
       </div>
       ${finished ? (s.m.hp<=0
           ? `<p style="text-align:center;font-weight:800;">¡Victoria! 🏆</p>
-             <div class="modal-actions"><button class="status-btn action-btn" id="nextFloor">${s.m.floor===pet.dungeonFloor?'Siguiente piso':'Volver a la mazmorra'}</button></div>`
+             <div class="modal-actions"><button class="status-btn action-btn" id="nextFloor">${s.m.floor===pet.dungeonFloor?'Siguiente piso':'Volver a la mazmorra'}</button></div>
+             <div class="modal-actions"><button class="status-btn action-btn" id="rematchDg">🔁 Volver a pelear con ${s.m.name}</button></div>`
           : `<p style="text-align:center;font-weight:800;">${s.m.name} te ha derrotado 💥</p>
              <div class="modal-actions"><button class="status-btn action-btn" id="retryFloor">Reintentar</button></div>`)
       : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
@@ -1933,6 +2015,7 @@ body{padding:0;align-items:stretch;}
       <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
     const meCv = document.getElementById('dungeonBattleMe');
+    document.getElementById('dgViewStats2').onclick = ()=>{ sfx('tap'); openInfoModal(); };
     if(meCv){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet), true); useScreenCanvas(); }
     const monCv = document.getElementById('dungeonBattleMon');
     if(monCv){ useCanvas(monCv); drawCreature(s.m.sprite, true); useScreenCanvas(); }
@@ -1974,6 +2057,7 @@ body{padding:0;align-items:stretch;}
       });
     } else if(s.m.hp<=0){
       document.getElementById('nextFloor').onclick=()=>{ sfx('tap'); dungeonState=null; renderDungeonHome(); };
+      document.getElementById('rematchDg').onclick=()=>{ sfx('tap'); startDungeonBattle(s.m); };
     } else {
       document.getElementById('retryFloor').onclick=()=>{ sfx('tap'); dungeonState=null; renderDungeonHome(); };
     }
@@ -2151,7 +2235,8 @@ body{padding:0;align-items:stretch;}
         <div class="fighter" id="obFighter2"><div class="battle-sprite-box"><canvas id="obCanvas2" width="200" height="200"></canvas><div class="name-tag">${doc.p2.name}</div></div><small>${doc.p2.species}</small></div>
       </div>
       ${doc.finished ? `<p style="text-align:center;font-weight:800;">${doc.winner} gana la batalla 🏆</p>
-        <div class="modal-actions"><button id="backOnline">Volver a la arena</button></div>`
+        <div class="modal-actions"><button id="backOnline">Volver a la arena</button></div>
+        <div class="modal-actions"><button class="status-btn action-btn" id="rematchOnline">📣 Publicar otro reto</button></div>`
       : myMoveSet ? `<p class="small-note" style="text-align:center;">Esperando el movimiento de ${opp.name}...</p>`
       : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
         <div class="movegrid">
@@ -2198,6 +2283,8 @@ body{padding:0;align-items:stretch;}
       }
       const backBtn = document.getElementById('backOnline');
       if(backBtn) backBtn.onclick = ()=>{ sfx('tap'); renderOnlineHome(); };
+      const rematchBtn = document.getElementById('rematchOnline');
+      if(rematchBtn) rematchBtn.onclick = ()=>{ sfx('tap'); createChallenge(); };
     }
   }
   let lastAnnouncedBattleId = null;
@@ -2313,11 +2400,115 @@ body{padding:0;align-items:stretch;}
         <button class="status-btn" id="gameCatch">🍓 Atrapa la fruta</button>
         <button class="status-btn" id="gameMemory">🧠 Memoria</button>
         <button class="status-btn" id="gameSimon">🎵 Simón dice</button>
+        <button class="status-btn" id="gameBubbles">🫧 Revienta burbujas</button>
+        <button class="status-btn" id="gameTiming">🎯 Toque perfecto</button>
       </div>
     `;
     document.getElementById('gameCatch').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startCatchGame(); };
     document.getElementById('gameMemory').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startMemoryGame(); };
     document.getElementById('gameSimon').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startSimonGame(); };
+    document.getElementById('gameBubbles').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startBubblesGame(); };
+    document.getElementById('gameTiming').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startTimingGame(); };
+  }
+
+  function startBubblesGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Toca las burbujas antes de que exploten solas. ¡15 segundos!</p>
+      <div class="game-hud"><span>Puntos: <b id="bubScore">0</b></span><span>Tiempo: <b id="bubTime">15</b>s</span></div>
+      <div class="game-area" id="bubArea" style="position:relative;"></div>
+    `;
+    let score=0, timeLeft=15;
+    const area = document.getElementById('bubArea');
+    const BUB=['🫧','⭐','💎'];
+    function spawnBubble(){
+      if(!document.getElementById('bubArea')) return;
+      const b = document.createElement('div');
+      b.className='game-item';
+      b.style.fontSize='30px';
+      b.textContent = BUB[Math.floor(Math.random()*BUB.length)];
+      const leftPct = 8+Math.random()*80, topPct = 8+Math.random()*76;
+      b.style.left = leftPct+'%'; b.style.top = topPct+'%';
+      b.style.pointerEvents = 'auto'; b.style.cursor='pointer';
+      area.appendChild(b);
+      const life = setTimeout(()=>{ b.remove(); }, 900);
+      b.onclick = ()=>{
+        clearTimeout(life);
+        score++; document.getElementById('bubScore').textContent=score;
+        sfx('tap');
+        b.remove();
+      };
+    }
+    const spawnT = setInterval(spawnBubble, 550);
+    const timerT = setInterval(()=>{
+      timeLeft--;
+      document.getElementById('bubTime').textContent = timeLeft;
+      if(timeLeft<=0){
+        clearInterval(spawnT); clearInterval(timerT);
+        area.innerHTML='';
+        const gain = Math.min(28, score*3);
+        finishMinigame(gain, 6, '¡'+pet.name+' reventó '+score+' burbujas! +'+gain+' de ánimo');
+        showGameResult('🫧 Revienta burbujas', score+' burbujas reventadas', gain);
+      }
+    }, 1000);
+    minigameTimers.push(spawnT, timerT);
+  }
+
+  function startTimingGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Toca justo cuando el círculo esté pequeño y verde. 5 intentos.</p>
+      <div class="game-hud"><span>Puntos: <b id="timScore">0</b></span><span>Intento: <b id="timTry">1</b>/5</span></div>
+      <div class="game-area" id="timArea" style="display:flex;align-items:center;justify-content:center;">
+        <div id="timRing" style="width:120px;height:120px;border-radius:50%;border:6px solid #ff5c5c;transition:width .05s linear, height .05s linear, border-color .1s;"></div>
+      </div>
+    `;
+    let score=0, tries=0;
+    const ring = document.getElementById('timArea');
+    let size, shrinking, raf;
+    function nextAttempt(){
+      tries++;
+      document.getElementById('timTry').textContent = Math.min(tries,5);
+      size = 120; shrinking=true;
+      step();
+    }
+    function step(){
+      const el = document.getElementById('timRing');
+      if(!el) return;
+      if(shrinking){
+        size -= 1.6;
+        if(size<=20){ size=20; shrinking=false; }
+      } else {
+        size += 1.6;
+        if(size>=120){ endAttempt(0); return; }
+      }
+      el.style.width = size+'px'; el.style.height = size+'px';
+      const sweet = size<=48 && size>=28;
+      el.style.borderColor = sweet ? '#5eff9e' : '#ff5c5c';
+      raf = requestAnimationFrame(step);
+    }
+    function endAttempt(pts){
+      cancelAnimationFrame(raf);
+      score += pts;
+      document.getElementById('timScore').textContent = score;
+      sfx(pts>0?'tap':'hit');
+      if(tries>=5){
+        const gain = Math.min(28, score);
+        finishMinigame(gain, 5, '¡'+pet.name+' consiguió '+score+' puntos de precisión! +'+gain+' de ánimo');
+        showGameResult('🎯 Toque perfecto', score+' puntos de precisión', gain);
+      } else {
+        setTimeout(nextAttempt, 500);
+      }
+    }
+    ring.onclick = ()=>{
+      const el = document.getElementById('timRing');
+      if(!el) return;
+      const sweet = size<=48 && size>=28;
+      endAttempt(sweet ? 6 : 1);
+    };
+    nextAttempt();
   }
 
   function startCatchGame(){
