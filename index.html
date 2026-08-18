@@ -119,6 +119,12 @@
   .agebadge{font-size:11px;color:var(--muted);font-weight:700;}
   .topbar-right{display:flex;align-items:center;gap:10px;}
   .mutebtn{font-size:15px;cursor:pointer;user-select:none;line-height:1;}
+  .installbtn{
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;color:var(--luz);
+    background:rgba(125,255,179,.12);border:1px solid rgba(125,255,179,.4);
+    border-radius:20px;padding:5px 11px;cursor:pointer;
+  }
+  .installbtn:active{transform:scale(.95);}
   .screen-bezel{
     position:relative;border-radius:26px;padding:16px;isolation:isolate;
     background:
@@ -480,6 +486,7 @@ body{padding:0;align-items:stretch;}
   <div class="topbar">
     <div class="brand"><span class="rune"></span>BYTE<span>MON</span><span class="rune" style="animation-delay:1.2s"></span></div>
     <div class="topbar-right">
+      <button id="btnInstall" class="installbtn" style="display:none;">⬇️ Instalar</button>
       <span id="btnMute" class="mutebtn" role="button" aria-label="Silenciar sonido" tabindex="0">🔊</span>
       <div class="agebadge" id="ageBadge">Edad: 0h</div>
     </div>
@@ -3260,6 +3267,30 @@ body{padding:0;align-items:stretch;}
     window.addEventListener('load', ()=>{
       navigator.serviceWorker.register('sw.js').catch(()=>{ /* si falla, la app sigue funcionando igual, solo sin caché offline */ });
     });
+  }
+
+  // capturo el aviso de instalación del propio navegador para lanzarlo yo desde mi botón,
+  // así no dependo de que la persona encuentre la opción escondida en el menú de Chrome
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('btnInstall');
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if(installBtn) installBtn.style.display = 'inline-block';
+  });
+  if(installBtn){
+    installBtn.addEventListener('click', async ()=>{
+      if(!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installBtn.style.display = 'none';
+    });
+  }
+  // si ya la tengo instalada (o abierta como app independiente), no hace falta mostrar el botón
+  window.addEventListener('appinstalled', ()=>{ if(installBtn) installBtn.style.display = 'none'; });
+  if(window.matchMedia('(display-mode: standalone)').matches && installBtn){
+    installBtn.style.display = 'none';
   }
 </script>
 </body>
