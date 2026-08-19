@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
 <!-- Solo necesito esto si subo el archivo fuera de Claude (ver mis notas al final del código) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
@@ -138,7 +139,7 @@
   .hudcorner.tr{top:3px;right:3px;border-top:2px solid;border-right:2px solid;}
   .hudcorner.bl{bottom:3px;left:3px;border-bottom:2px solid;border-left:2px solid;}
   .hudcorner.br{bottom:3px;right:3px;border-bottom:2px solid;border-right:2px solid;}
-  #screen{display:block;image-rendering:pixelated;image-rendering:crisp-edges;}
+  #screen{display:block;}
   .scanlines{
     position:absolute;inset:0;pointer-events:none;
     background:repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 4px);
@@ -697,29 +698,18 @@ body{padding:0;align-items:stretch;}
   const STORAGE_KEY = 'bytemon:pet';
   const GRID = 24;
   const CELL_PX = 20;
-  const screenCanvas = document.getElementById('screen');
-  let canvas = screenCanvas;
+  const screenCanvas = document.getElementById('screen'); // este lienzo ahora es solo para el 3D, ya no lo toco en 2D
+  const dummyCanvas2D = document.createElement('canvas');
+  dummyCanvas2D.width = GRID*CELL_PX; dummyCanvas2D.height = GRID*CELL_PX;
+  let canvas = dummyCanvas2D;
   let ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   let cell = canvas.width / GRID;
   let cinematicActive = false;
-  function resizeScreenCanvas(){
-    // ajusto la altura del lienzo a la proporción real de la pantalla, así no me quedan bandas negras arriba/abajo
-    const aspect = window.innerHeight / window.innerWidth;
-    screenCanvas.width = GRID * CELL_PX;
-    screenCanvas.height = Math.max(screenCanvas.width, Math.round(GRID * CELL_PX * aspect));
-    if(canvas === screenCanvas){ cell = screenCanvas.width / GRID; }
-  }
-  resizeScreenCanvas();
   function useCanvas(c){
     canvas = c; ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false; cell = c.width / GRID;
   }
-  function useScreenCanvas(){ useCanvas(screenCanvas); }
-  let screenResizeT;
-  window.addEventListener('resize', ()=>{
-    clearTimeout(screenResizeT);
-    screenResizeT = setTimeout(()=>{ resizeScreenCanvas(); if(hasLoaded) render(); }, 200);
-  });
+  function useScreenCanvas(){ useCanvas(dummyCanvas2D); }
 
   // ---------- mis sonidos, los genero yo mismo con osciladores (nada de archivos de audio) ----------
   let audioCtx = null;
@@ -896,14 +886,7 @@ body{padding:0;align-items:stretch;}
     if(!('Notification' in window) || Notification.permission!=='granted') return;
     if(!document.hidden) return; // si estoy mirando la app ahora mismo, ya lo veo en pantalla, no hace falta el aviso
     const body = pet.name+' tiene hambre — dale de comer 🍖';
-    if(navigator.serviceWorker && navigator.serviceWorker.ready){
-      navigator.serviceWorker.ready.then(reg=>{
-        if(reg && reg.showNotification) reg.showNotification('BYTEMON', {body, icon:'icon-192.png', tag:'hambre'});
-        else new Notification('BYTEMON', {body});
-      }).catch(()=>{ try{ new Notification('BYTEMON', {body}); }catch(e){} });
-    } else {
-      try{ new Notification('BYTEMON', {body}); }catch(e){}
-    }
+    try{ new Notification('BYTEMON', {body}); }catch(e){}
   }
 
   function computePath(){
@@ -963,13 +946,12 @@ body{padding:0;align-items:stretch;}
     </div>`;
     document.getElementById('modalRoot').appendChild(el);
     refreshScrollLock();
+    stopMiniPreviews();
     candidates.forEach((c,i)=>{
       const cv = document.getElementById('evoChoiceCv'+i);
-      useCanvas(cv);
-      drawCreature({stage:3, frame:0, sick:false, sleeping:false, temperament, path,
-        hue:c.hue, bodyShape:c.bodyShape, featureType:c.featureType, eyeStyle:c.eyeStyle, pattern:c.pattern, bgSeed:pet.bgSeed});
+      render3DMiniPreview(cv, {stage:3, temperament, path,
+        hue:c.hue, bodyShape:c.bodyShape, featureType:c.featureType, eyeStyle:c.eyeStyle, pattern:c.pattern});
     });
-    useScreenCanvas();
     el.querySelectorAll('.evo-choice-card').forEach(card=>{
       card.onclick = ()=>{
         sfx('tap');
@@ -986,6 +968,7 @@ body{padding:0;align-items:stretch;}
         pet.pattern = c.pattern;
         pet.stage = 3;
         const post = snapshotVisual(pet);
+        stopMiniPreviews();
         el.remove();
         refreshScrollLock();
         evolutionChoicePending = false;
@@ -1531,8 +1514,7 @@ body{padding:0;align-items:stretch;}
     removeGameOver();
 
     pet.frame = (pet.frame||0)+1;
-    if(pet.stage===0) drawEgg(pet.frame, pet.bgSeed);
-    else drawCreature(pet);
+    update3DMainScene();
   }
 
   function refreshScrollLock(){
@@ -1540,7 +1522,7 @@ body{padding:0;align-items:stretch;}
     document.body.style.overflow = has ? 'hidden' : '';
   }
 
-  // en el APK, el botón "atrás" de Android dispara un popstate; si tengo un menú abierto,
+  // si el navegador dispara un "atrás" (botón físico, gesto, o el de la propia app) y tengo un menú abierto,
   // lo cierro yo en vez de dejar que el sistema se salga de la app entera
   window.addEventListener('popstate', ()=>{
     const modalRoot = document.getElementById('modalRoot');
@@ -1749,11 +1731,12 @@ body{padding:0;align-items:stretch;}
     </div>`;
     document.getElementById('modalRoot').appendChild(el);
     refreshScrollLock();
-    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); stopBattleIdle(); el.remove(); refreshScrollLock(); };
-    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); stopBattleIdle(); el.remove(); refreshScrollLock(); } });
+    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); stopBattleIdle(); stopMiniPreviews(); el.remove(); refreshScrollLock(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); stopBattleIdle(); stopMiniPreviews(); el.remove(); refreshScrollLock(); } });
     function setTab(t){
       stopBattlePoll();
       stopBattleIdle();
+      stopMiniPreviews();
       document.getElementById('tabLocal').classList.toggle('active', t==='local');
       document.getElementById('tabOnline').classList.toggle('active', t==='online');
       document.getElementById('tabDungeon').classList.toggle('active', t==='dungeon');
@@ -1797,6 +1780,7 @@ body{padding:0;align-items:stretch;}
     renderLocalBattle();
   }
   function renderLocalBattle(){
+    stopMiniPreviews();
     const c = document.getElementById('battleContent');
     const s = localState;
     if(!s) return;
@@ -1823,13 +1807,8 @@ body{padding:0;align-items:stretch;}
       <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
     const cv1 = document.getElementById('lbCanvas1'), cv2 = document.getElementById('lbCanvas2');
-    if(cv1){ useCanvas(cv1); drawCreature({...s.p1, stage:s.p1.stage||3, frame:0, sick:false, sleeping:false}, true); }
-    if(cv2){ useCanvas(cv2); drawCreature({...s.p2, stage:s.p2.stage||3, frame:0, sick:false, sleeping:false}, true); }
-    useScreenCanvas();
-    startBattleIdle(['lbCanvas1','lbCanvas2'], ()=>[
-      {...s.p1, stage:s.p1.stage||3, sick:false, sleeping:false},
-      {...s.p2, stage:s.p2.stage||3, sick:false, sleeping:false}
-    ]);
+    if(cv1) render3DMiniPreview(cv1, {...s.p1, stage:s.p1.stage||3, sick:false, sleeping:false});
+    if(cv2) render3DMiniPreview(cv2, {...s.p2, stage:s.p2.stage||3, sick:false, sleeping:false});
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=async ()=>{
@@ -1925,7 +1904,64 @@ body{padding:0;align-items:stretch;}
   }
 
   let dungeonState = null;
+  function disposeThreeRenderer(renderer){
+    if(!renderer) return;
+    try{
+      renderer.dispose();
+      const gl = renderer.getContext && renderer.getContext();
+      const ext = gl && gl.getExtension && gl.getExtension('WEBGL_lose_context');
+      if(ext) ext.loseContext();
+    }catch(e){}
+  }
+  let miniPreviewInstances = [];
+  function stopMiniPreviews(){
+    miniPreviewInstances.forEach(inst=>{
+      if(inst.raf) cancelAnimationFrame(inst.raf);
+      disposeThreeRenderer(inst.renderer);
+    });
+    miniPreviewInstances = [];
+  }
+  function render3DMiniPreview(canvasEl, traitsOrNull){
+    if(typeof THREE==='undefined' || !canvasEl) return;
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+    const w = canvasEl.clientWidth||84, h = canvasEl.clientHeight||84;
+    renderer.setSize(w, h, false);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(34, w/h, .1, 20);
+    camera.position.set(0, .5, 4.7);
+    camera.lookAt(0, .2, 0);
+    scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x201030, 1.1));
+    const dir = new THREE.DirectionalLight(0xffffff, .9);
+    dir.position.set(2,3,4);
+    scene.add(dir);
+    const seedForTheme = (traitsOrNull && traitsOrNull.hue!=null) ? traitsOrNull.hue : 210;
+    scene.background = seededHslColor(seedForTheme+3, .45, .16);
+    scene.fog = new THREE.Fog(scene.background.getHex(), 5, 11);
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(3.2, 24),
+      new THREE.MeshStandardMaterial({ color: seededHslColor(seedForTheme+7, .4, .3), roughness:.9, flatShading:true })
+    );
+    ground.rotation.x = -Math.PI/2;
+    ground.position.y = -1.2;
+    scene.add(ground);
+    const model = traitsOrNull ? build3DCreature(traitsOrNull) : build3DEgg();
+    scene.add(model);
+    const inst = { renderer, raf:null };
+    let bobT = Math.random()*10;
+    function loop(){
+      bobT += 0.045;
+      model.rotation.y = 0.42; // mirando de frente, ya no gira sin parar
+      model.position.y = Math.sin(bobT)*0.05;
+      renderer.render(scene, camera);
+      inst.raf = requestAnimationFrame(loop);
+    }
+    loop();
+    miniPreviewInstances.push(inst);
+  }
+
   function renderDungeonHome(){
+    stopMiniPreviews();
     const c = document.getElementById('battleContent');
     const monster = generateMonster(pet.dungeonFloor);
     const rew = dungeonRewards(monster);
@@ -1964,12 +2000,9 @@ body{padding:0;align-items:stretch;}
     document.getElementById('startDungeon').onclick = ()=>{ sfx('tap'); startDungeonBattle(monster); };
     document.getElementById('dgViewStats').onclick = ()=>{ sfx('tap'); openInfoModal(); };
     const meCv = document.getElementById('dungeonPreviewMe');
-    if(pet.stage>0){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet), true); useScreenCanvas(); }
+    if(pet.stage>0 && meCv){ render3DMiniPreview(meCv, pet.stage===0 ? null : snapshotVisual(pet)); }
     const monCv = document.getElementById('dungeonPreviewMon');
-    if(monCv){ useCanvas(monCv); drawCreature(monster.sprite, true); useScreenCanvas(); }
-    if(pet.stage>0){
-      startBattleIdle(['dungeonPreviewMe','dungeonPreviewMon'], ()=>[snapshotVisual(pet), monster.sprite]);
-    }
+    if(monCv){ render3DMiniPreview(monCv, monster.sprite); }
     c.querySelectorAll('[data-floor]').forEach(chip=>{
       chip.onclick=()=>{ sfx('tap'); startDungeonBattle(generateMonster(parseInt(chip.getAttribute('data-floor'),10))); };
     });
@@ -1985,6 +2018,7 @@ body{padding:0;align-items:stretch;}
   }
 
   function renderDungeonBattle(){
+    stopMiniPreviews();
     const c = document.getElementById('battleContent');
     const s = dungeonState;
     if(!s) return;
@@ -2016,12 +2050,9 @@ body{padding:0;align-items:stretch;}
     `;
     const meCv = document.getElementById('dungeonBattleMe');
     document.getElementById('dgViewStats2').onclick = ()=>{ sfx('tap'); openInfoModal(); };
-    if(meCv){ useCanvas(meCv); if(pet.stage===0) drawEgg(0, pet.bgSeed); else drawCreature(snapshotVisual(pet), true); useScreenCanvas(); }
+    if(meCv){ render3DMiniPreview(meCv, pet.stage===0 ? null : snapshotVisual(pet)); }
     const monCv = document.getElementById('dungeonBattleMon');
-    if(monCv){ useCanvas(monCv); drawCreature(s.m.sprite, true); useScreenCanvas(); }
-    if(pet.stage>0){
-      startBattleIdle(['dungeonBattleMe','dungeonBattleMon'], ()=>[snapshotVisual(pet), s.m.sprite]);
-    }
+    if(monCv){ render3DMiniPreview(monCv, s.m.sprite); }
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=async ()=>{
@@ -2220,6 +2251,7 @@ body{padding:0;align-items:stretch;}
   }
 
   function renderOnlineBattleUI(doc, mySlot, id){
+    stopMiniPreviews();
     const c = document.getElementById('battleContent');
     const me = doc[mySlot];
     const opp = doc[mySlot==='p1'?'p2':'p1'];
@@ -2247,13 +2279,8 @@ body{padding:0;align-items:stretch;}
       <div class="battlelog">${(doc.log||[]).slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
     const ob1 = document.getElementById('obCanvas1'), ob2 = document.getElementById('obCanvas2');
-    if(ob1){ useCanvas(ob1); drawCreature({...doc.p1, stage:doc.p1.stage||3, frame:0, sick:false, sleeping:false}, true); }
-    if(ob2){ useCanvas(ob2); drawCreature({...doc.p2, stage:doc.p2.stage||3, frame:0, sick:false, sleeping:false}, true); }
-    useScreenCanvas();
-    startBattleIdle(['obCanvas1','obCanvas2'], ()=>[
-      {...doc.p1, stage:doc.p1.stage||3, sick:false, sleeping:false},
-      {...doc.p2, stage:doc.p2.stage||3, sick:false, sleeping:false}
-    ]);
+    if(ob1) render3DMiniPreview(ob1, {...doc.p1, stage:doc.p1.stage||3, sick:false, sleeping:false});
+    if(ob2) render3DMiniPreview(ob2, {...doc.p2, stage:doc.p2.stage||3, sick:false, sleeping:false});
     if(doc.resolvedRound>0 && lastOnlineShakeRound!==doc.resolvedRound){
       lastOnlineShakeRound = doc.resolvedRound;
       const dmg1 = Math.max(0, Math.round(lastOnlineHp.p1 - doc.p1.hp));
@@ -2789,20 +2816,19 @@ body{padding:0;align-items:stretch;}
     </div>`;
     document.getElementById('modalRoot').appendChild(el);
     refreshScrollLock();
+    stopMiniPreviews();
     ['luz','sombra','equilibrio'].forEach(senda=>{
       const cv = document.getElementById('evoPreview_'+senda);
       if(!cv) return;
       const snap = previewSnapshot(senda, lockedAff||trendAff, lockedTemp||trendTemp);
-      useCanvas(cv);
-      drawCreature(snap);
+      render3DMiniPreview(cv, snap);
     });
     if(pet.stage>=3){
       const cv = document.getElementById('evoPreviewCurrent');
-      if(cv){ useCanvas(cv); drawCreature(snapshotVisual(pet)); }
+      if(cv){ render3DMiniPreview(cv, snapshotVisual(pet)); }
     }
-    useScreenCanvas();
-    document.getElementById('closeTree').onclick=()=>{ el.remove(); refreshScrollLock(); };
-    el.addEventListener('click',(e)=>{ if(e.target===el){ el.remove(); refreshScrollLock(); } });
+    document.getElementById('closeTree').onclick=()=>{ stopMiniPreviews(); el.remove(); refreshScrollLock(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stopMiniPreviews(); el.remove(); refreshScrollLock(); } });
   }
 
 
@@ -2813,6 +2839,429 @@ body{padding:0;align-items:stretch;}
     if(soundOn) sfx('tap');
   };
 
+  // ---------- mi visor 3D, primera fase: construyo la mascota en 3D de verdad a partir de sus mismos rasgos ----------
+  let three3D = null; // {renderer, scene, camera, group, raf, dragging, lastX, lastY, rotY, rotX}
+
+  function hueToThreeColor(hue, sat, light){
+    const c = new THREE.Color();
+    c.setHSL(hue/360, sat, light);
+    return c;
+  }
+
+  function build3DBody(pal, bodyShape){
+    // construyo el cuerpo apilando "lonchas" de cubos, igual que en 2D relleno fila a fila —
+    // así se nota que es la misma mascota, no una figura suave sin relación con el pixel art
+    const group = new THREE.Group();
+    const profileMap = {
+      redondo:['round',1,1,1], alargado:['round',.78,1.32,.78], compacto:['round',1.22,.8,1.12],
+      esbelto:['round',.62,1.5,.62], macizo:['round',1.35,.7,1.25], ovalado:['round',.85,1.15,.85],
+      anguloso:['diamond',1,1,1], triangular:['wedge',1,1,1]
+    };
+    const [style, sx, sy, sz] = profileMap[bodyShape] || ['round',1,1,1];
+    const rows = style==='diamond' ? 6 : 9;
+    const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.8, flatShading:true });
+    for(let i=0;i<rows;i++){
+      const yNorm = (i/(rows-1))*2-1;
+      let widthFactor;
+      if(style==='wedge') widthFactor = Math.max(0, 1-(yNorm*.5+.5));
+      else if(style==='diamond') widthFactor = Math.max(0, 1-Math.abs(yNorm));
+      else widthFactor = Math.sqrt(Math.max(0, 1-yNorm*yNorm));
+      if(widthFactor<=0.06) continue;
+      const boxW = widthFactor*1.75*sx, boxD = widthFactor*1.75*sz, boxH = (2/rows)*sy*1.08;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), mat);
+      box.position.y = yNorm*sy;
+      group.add(box);
+    }
+    return group;
+  }
+
+  function build3DFeature(pal, featureType, rx, ry){
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: pal.accent, roughness:.8, flatShading:true });
+    function cone(r,h){ return new THREE.Mesh(new THREE.ConeGeometry(r,h,4), mat); } // 4 caras = pirámide, no cono liso
+    function sphere(r){ return new THREE.Mesh(new THREE.BoxGeometry(r*1.6,r*1.6,r*1.6), mat); } // cubo en vez de esfera
+    function box(w,h,d){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); }
+    function cyl(r1,r2,h){ return new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,4), mat); }
+    if(featureType==='alas'){
+      [-1,1].forEach(side=>{
+        const wing = box(.08, ry*1.1, rx*1.3);
+        wing.position.set(side*rx*1.05, ry*.15, 0);
+        wing.rotation.z = side*0.35;
+        g.add(wing);
+      });
+    } else if(featureType==='cuernos'){
+      [-1,1].forEach(side=>{
+        const horn = cone(.16, ry*.9);
+        horn.position.set(side*rx*.45, ry*1.05, 0);
+        horn.rotation.z = side*0.3;
+        g.add(horn);
+      });
+    } else if(featureType==='orejas'){
+      [-1,1].forEach(side=>{
+        const ear = sphere(rx*.28);
+        ear.position.set(side*rx*.7, ry*.9, 0);
+        g.add(ear);
+      });
+    } else if(featureType==='aletas'){
+      [-1,1].forEach(side=>{
+        const fin = box(.06, ry*.6, rx*.6);
+        fin.position.set(side*rx*.95, -ry*.1, 0);
+        fin.rotation.z = side*0.5;
+        g.add(fin);
+      });
+    } else if(featureType==='antenas'){
+      [-1,1].forEach(side=>{
+        const stalk = cyl(.03,.05, ry*.8);
+        stalk.position.set(side*rx*.35, ry*1.15, 0);
+        const tip = sphere(.09);
+        tip.position.set(side*rx*.35, ry*1.55, 0);
+        g.add(stalk); g.add(tip);
+      });
+    } else if(featureType==='pinchos'){
+      for(let i=-1;i<=1;i++){
+        const spike = cone(.14, .5);
+        spike.position.set(i*rx*.4, ry*1.05, 0);
+        g.add(spike);
+      }
+    } else if(featureType==='espinas'){
+      for(let i=0;i<5;i++){
+        const t = i/4;
+        const spike = cone(.09,.34);
+        spike.position.set(-rx*.6+t*rx*1.2, ry*.75+Math.sin(t*Math.PI)*.25, 0);
+        g.add(spike);
+      }
+    } else if(featureType==='cresta'){
+      for(let i=0;i<3;i++){
+        const spike = cone(.13-i*.03, .55-i*.12);
+        spike.position.set(-.1+i*.15, ry*1.0+i*.12, 0);
+        g.add(spike);
+      }
+    } else if(featureType==='cola'){
+      const tail = cyl(.18,.08, ry*1.1);
+      tail.position.set(0, -ry*.1, rx*1.1);
+      tail.rotation.x = Math.PI/2.4;
+      g.add(tail);
+    } else if(featureType==='caparazon'){
+      for(let i=0;i<3;i++){
+        const w = rx*(1.6-i*.4);
+        const shell = box(w, .28, w);
+        shell.position.set(0, ry*.85+i*.22, 0);
+        g.add(shell);
+      }
+    }
+    return g;
+  }
+
+  function build3DEyes(eyeStyle, rx, ry, sleeping){
+    const g = new THREE.Group();
+    const dark = new THREE.MeshStandardMaterial({ color:0x1a2620, roughness:.6, flatShading:true });
+    const glow = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x66ffcc, emissiveIntensity:.8, flatShading:true });
+    function eye(r, mat){ return new THREE.Mesh(new THREE.BoxGeometry(r*1.7,r*1.7,r*1.1), mat); } // pixel cuadrado, no esfera
+    function tagEye(mesh){ mesh.userData.isEye = true; mesh.userData.baseScale = mesh.scale.clone(); return mesh; }
+    const ez = rx*.88, ey = ry*.15;
+    if(sleeping){
+      [-1,1].forEach(s=>{ const e=tagEye(new THREE.Mesh(new THREE.BoxGeometry(rx*.26,.05,.05), dark)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+      return g;
+    }
+    if(eyeStyle==='ciclope'){
+      const e = tagEye(eye(rx*.24, dark)); e.position.set(0, ey, ez); g.add(e);
+    } else if(eyeStyle==='trio'){
+      [-1,1].forEach(s=>{ const e=tagEye(eye(rx*.15,dark)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+      const e3 = tagEye(eye(rx*.12,dark)); e3.position.set(0, ey-ry*.25, ez*.95); g.add(e3);
+    } else if(eyeStyle==='brillantes'){
+      [-1,1].forEach(s=>{ const e=tagEye(eye(rx*.17, glow)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+    } else if(eyeStyle==='dormidos'){
+      [-1,1].forEach(s=>{ const e=tagEye(new THREE.Mesh(new THREE.BoxGeometry(rx*.24,.04,.04), dark)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+    } else if(eyeStyle==='rasgados'){
+      [-1,1].forEach(s=>{ const e=tagEye(eye(rx*.14, dark)); e.scale.set(1,1.7,.6); e.userData.baseScale = e.scale.clone(); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+    } else {
+      [-1,1].forEach(s=>{ const e=tagEye(eye(rx*.17, dark)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+    }
+    return g;
+  }
+
+  function build3DCreature(traits){
+    const group = new THREE.Group();
+    const hue = traits.hue||0;
+    const pal = {
+      body: hueToThreeColor(hue, .55, .58),
+      belly: hueToThreeColor(hue, .4, .82),
+      dark: hueToThreeColor(hue, .55, .28),
+      accent: hueToThreeColor((hue+35)%360, .7, .6)
+    };
+    const body = build3DBody(pal, traits.bodyShape||'redondo');
+    group.add(body);
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(1.05,1.1,.55), new THREE.MeshStandardMaterial({color:pal.belly, roughness:.75, flatShading:true}));
+    belly.position.set(0,-.25,.55);
+    group.add(belly);
+    const feat = build3DFeature(pal, traits.featureType||'alas', 1, 1);
+    group.add(feat);
+    const eyes = build3DEyes(traits.eyeStyle||'redondos', 1, 1, !!traits.sleeping);
+    group.add(eyes);
+    if(traits.pattern==='manchas'){
+      for(let i=0;i<4;i++){
+        const spot = new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.12), new THREE.MeshStandardMaterial({color:pal.dark, flatShading:true}));
+        spot.position.set((Math.random()-.5)*1.2, (Math.random()-.5)*.8, .7+Math.random()*.2);
+        group.add(spot);
+      }
+    } else if(traits.pattern==='rayas'){
+      for(let i=-1;i<=1;i++){
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(.1,.85,.1), new THREE.MeshStandardMaterial({color:pal.dark, flatShading:true}));
+        stripe.position.set(i*.32, 0, .68);
+        group.add(stripe);
+      }
+    }
+    // contorno oscuro tipo "cartoon" para que se note el borde, como el pixel art recortado
+    const outlineMat = new THREE.MeshBasicMaterial({ color:0x0a1712, side:THREE.BackSide });
+    const bodyOutline = build3DBody({body:0x0a1712}, traits.bodyShape||'redondo');
+    bodyOutline.traverse(o=>{ if(o.isMesh){ o.material = outlineMat; o.scale.multiplyScalar(1.08); } });
+    group.add(bodyOutline);
+    return group;
+  }
+
+  function open3DModal(){
+    if(pet.stage===0 || !pet.alive){ showToast('Tu mascota necesita nacer primero 🥚'); return; }
+    if(typeof THREE === 'undefined'){ showToast('No se ha podido cargar el visor 3D — revisa tu conexión'); return; }
+    sfx('tap');
+    const el = document.createElement('div');
+    el.className='modal-backdrop'; el.id='modal3D';
+    el.innerHTML = `<div class="modal">
+      <button class="close-x" id="close3D">✕</button>
+      <h3>${speciesDisplay(pet)} EN 3D</h3>
+      <p class="small-note">Arrastra para girarla. Este es el primer paso hacia una versión completa en 3D.</p>
+      <div id="three-wrap" style="width:100%;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:#0a1712;margin-top:10px;touch-action:none;">
+        <canvas id="three-canvas" style="display:block;width:100%;height:100%;"></canvas>
+      </div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    refreshScrollLock();
+    document.getElementById('close3D').onclick = ()=>{ stop3D(); el.remove(); refreshScrollLock(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stop3D(); el.remove(); refreshScrollLock(); } });
+    try{ init3DScene(); }catch(e){ showToast('Tu dispositivo no puede mostrar el visor 3D'); console.error('3D init failed:', e); }
+  }
+
+  function stop3D(){
+    if(three3D && three3D.raf){ cancelAnimationFrame(three3D.raf); }
+    three3D = null;
+  }
+
+  function init3DScene(){
+    const wrap = document.getElementById('three-wrap');
+    const canvasEl = document.getElementById('three-canvas');
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+    renderer.setSize(w, h, false);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
+    camera.position.set(0, 0.5, 4.2);
+    const hemi = new THREE.HemisphereLight(0xbfe8ff, 0x201030, .8);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, .9);
+    dir.position.set(2,3,4);
+    scene.add(dir);
+    const group = build3DCreature(snapshotVisual(pet));
+    scene.add(group);
+
+    three3D = { renderer, scene, camera, group, raf:null, dragging:false, lastX:0, lastY:0, rotY:0.4, rotX:0 };
+    group.rotation.y = three3D.rotY;
+
+    function onDown(x,y){ three3D.dragging=true; three3D.lastX=x; three3D.lastY=y; }
+    function onMove(x,y){
+      if(!three3D || !three3D.dragging) return;
+      const dx = x-three3D.lastX, dy = y-three3D.lastY;
+      three3D.rotY += dx*0.01;
+      three3D.rotX = Math.max(-0.6, Math.min(0.6, three3D.rotX + dy*0.01));
+      three3D.group.rotation.y = three3D.rotY;
+      three3D.group.rotation.x = three3D.rotX;
+      three3D.lastX=x; three3D.lastY=y;
+    }
+    function onUp(){ if(three3D) three3D.dragging=false; }
+    canvasEl.addEventListener('mousedown', e=>onDown(e.clientX,e.clientY));
+    window.addEventListener('mousemove', e=>onMove(e.clientX,e.clientY));
+    window.addEventListener('mouseup', onUp);
+    canvasEl.addEventListener('touchstart', e=>{ const t=e.touches[0]; onDown(t.clientX,t.clientY); }, {passive:true});
+    canvasEl.addEventListener('touchmove', e=>{ const t=e.touches[0]; onMove(t.clientX,t.clientY); }, {passive:true});
+    canvasEl.addEventListener('touchend', onUp);
+
+    let autoSpin = true;
+    canvasEl.addEventListener('mousedown', ()=>{ autoSpin=false; });
+    canvasEl.addEventListener('touchstart', ()=>{ autoSpin=false; }, {passive:true});
+
+    function loop(){
+      if(!three3D) return;
+      if(autoSpin && !three3D.dragging){ three3D.rotY += 0.005; three3D.group.rotation.y = three3D.rotY; }
+      renderer.render(scene, camera);
+      three3D.raf = requestAnimationFrame(loop);
+    }
+    loop();
+  }
+
+  // ---------- mi escena 3D principal, la vista de siempre ahora en 3D de verdad, no un botón aparte ----------
+  let mainScene3D = null; // {renderer, scene, camera, group, groundColor, raf, dragging, lastX, lastY, rotY, rotX, bobT}
+  let mainSceneSignature = '';
+
+  function seededHslColor(seed, satBase, lightBase){
+    const rand = mulberry32(seed);
+    const hue = Math.floor(rand()*360);
+    return new THREE.Color().setHSL(hue/360, satBase, lightBase);
+  }
+
+  function build3DEgg(){
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color:0xfff3d6, roughness:.85, flatShading:true });
+    const rows = 9;
+    for(let i=0;i<rows;i++){
+      const yNorm = (i/(rows-1))*2-1;
+      const widthFactor = Math.sqrt(Math.max(0, 1-yNorm*yNorm));
+      if(widthFactor<=0.06) continue;
+      const boxW = widthFactor*1.5, boxD = widthFactor*1.5, boxH = (2/rows)*1.25;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), mat);
+      box.position.y = yNorm*1.15;
+      g.add(box);
+    }
+    const spotMat = new THREE.MeshStandardMaterial({ color:0xffd98a, roughness:.85, flatShading:true });
+    [[.4,.4,.7],[-.5,-.1,.6],[.1,-.6,.65]].forEach(p=>{
+      const spot = new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.1), spotMat);
+      spot.position.set(p[0],p[1],p[2]);
+      g.add(spot);
+    });
+    return g;
+  }
+
+  function initMainScene3D(){
+    const canvasEl = document.getElementById('screen');
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.set(0, 1.1, 5.2);
+    camera.lookAt(0, .3, 0);
+    const hemi = new THREE.HemisphereLight(0xbfe8ff, 0x201030, .9);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    dir.position.set(3,4,5);
+    scene.add(dir);
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(6, 32),
+      new THREE.MeshStandardMaterial({ color:0x2a6b4a, roughness:.9 })
+    );
+    ground.rotation.x = -Math.PI/2;
+    ground.position.y = -1.15;
+    scene.add(ground);
+    const group = new THREE.Group();
+    scene.add(group);
+
+    mainScene3D = { renderer, scene, camera, group, ground, raf:null, dragging:false, lastX:0, lastY:0, rotY:0.35, rotX:0, bobT:0 };
+
+    function onDown(x,y){ mainScene3D.dragging=true; mainScene3D.lastX=x; mainScene3D.lastY=y; }
+    function onMove(x,y){
+      if(!mainScene3D || !mainScene3D.dragging) return;
+      const dx=x-mainScene3D.lastX, dy=y-mainScene3D.lastY;
+      mainScene3D.rotY += dx*0.008;
+      mainScene3D.rotX = Math.max(-0.4, Math.min(0.4, mainScene3D.rotX + dy*0.008));
+      mainScene3D.lastX=x; mainScene3D.lastY=y;
+    }
+    function onUp(){ if(mainScene3D) mainScene3D.dragging=false; }
+    canvasEl.addEventListener('mousedown', e=>onDown(e.clientX,e.clientY));
+    window.addEventListener('mousemove', e=>onMove(e.clientX,e.clientY));
+    window.addEventListener('mouseup', onUp);
+    canvasEl.addEventListener('touchstart', e=>{ const t=e.touches[0]; onDown(t.clientX,t.clientY); }, {passive:true});
+    canvasEl.addEventListener('touchmove', e=>{ const t=e.touches[0]; onMove(t.clientX,t.clientY); }, {passive:true});
+    canvasEl.addEventListener('touchend', onUp);
+
+    resizeMainScene3D();
+
+    function computeMood(p){
+      if(p.sleeping) return 'sleeping';
+      if(p.sick) return 'sick';
+      if(p.happy>=65 && p.sac>=45) return 'happy';
+      if(p.happy<=30 || p.sac<=25) return 'sad';
+      if(p.energy<=25) return 'tired';
+      return 'neutral';
+    }
+    function applyMoodPose(model, mood, t){
+      let bobSpeed=0.03, bobAmp=0.06, eyeSquint=1, tiltZ=0, tiltX=0;
+      if(mood==='happy'){ bobSpeed=0.06; bobAmp=0.1; eyeSquint=.7; }
+      else if(mood==='sad'){ bobSpeed=0.015; bobAmp=0.025; eyeSquint=.55; tiltX=-.08; }
+      else if(mood==='tired'){ bobSpeed=0.012; bobAmp=0.02; eyeSquint=.35; tiltX=-.05; }
+      else if(mood==='sick'){ bobSpeed=0.02; bobAmp=0.03; tiltZ=Math.sin(t*1.7)*.05; eyeSquint=.6; }
+      else if(mood==='sleeping'){ bobSpeed=0.012; bobAmp=0.035; tiltX=-.15; }
+      model.rotation.x = tiltX;
+      model.rotation.z = tiltZ;
+      model.traverse(o=>{
+        if(o.userData && o.userData.isEye && o.userData.baseScale && mood!=='sleeping'){
+          o.scale.set(o.userData.baseScale.x, o.userData.baseScale.y*eyeSquint, o.userData.baseScale.z);
+        }
+      });
+      return {bobSpeed, bobAmp};
+    }
+
+    function loop(){
+      if(!mainScene3D) return;
+      const modalOpen = document.getElementById('modalRoot').children.length>0;
+      if(!modalOpen){
+        const mood = computeMood(pet);
+        const {bobSpeed, bobAmp} = mainScene3D.model ? applyMoodPose(mainScene3D.model, mood, mainScene3D.bobT) : {bobSpeed:.03, bobAmp:.06};
+        mainScene3D.bobT += bobSpeed;
+        mainScene3D.group.rotation.y = mainScene3D.rotY; // ya no giro solo — únicamente cuando arrastras con el dedo
+        mainScene3D.group.rotation.x = mainScene3D.rotX;
+        mainScene3D.group.position.y = Math.sin(mainScene3D.bobT)*bobAmp;
+        renderer.render(scene, camera);
+      }
+      mainScene3D.raf = requestAnimationFrame(loop);
+    }
+    loop();
+  }
+
+  function resizeMainScene3D(){
+    if(!mainScene3D) return;
+    const canvasEl = document.getElementById('screen');
+    const w = window.innerWidth, h = window.innerHeight;
+    mainScene3D.renderer.setSize(w, h, false);
+    mainScene3D.camera.aspect = w/h;
+    mainScene3D.camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', ()=>{ clearTimeout(mainScene3D&&mainScene3D._rT); resizeMainScene3D(); });
+
+  let usedThreeFallback = false;
+  function render2DFallback(){
+    // si el 3D no está disponible por lo que sea (sin conexión al CDN, WebGL no soportado...),
+    // no dejo la pantalla en blanco: vuelvo al dibujo en pixel art de toda la vida, que no depende de nada externo
+    if(!usedThreeFallback){
+      usedThreeFallback = true;
+      const aspect = window.innerHeight / window.innerWidth;
+      screenCanvas.width = GRID * CELL_PX;
+      screenCanvas.height = Math.max(screenCanvas.width, Math.round(GRID * CELL_PX * aspect));
+      screenCanvas.style.imageRendering = 'pixelated';
+    }
+    useCanvas(screenCanvas);
+    if(pet.stage===0) drawEgg(pet.frame, pet.bgSeed);
+    else drawCreature(pet);
+    useScreenCanvas();
+  }
+  let threeFailedOnce = false;
+  function update3DMainScene(){
+    if(typeof THREE === 'undefined'){ render2DFallback(); return; }
+    if(!mainScene3D && !threeFailedOnce){
+      try{ initMainScene3D(); }
+      catch(e){ threeFailedOnce = true; console.error('No pude iniciar el visor 3D, uso el pixel art de siempre:', e); }
+    }
+    if(!mainScene3D){ render2DFallback(); return; }
+    const sig = [pet.stage, pet.hue, pet.bodyShape, pet.featureType, pet.eyeStyle, pet.pattern, pet.sick, pet.sleeping, pet.bgSeed].join('|');
+    if(sig !== mainSceneSignature){
+      mainSceneSignature = sig;
+      while(mainScene3D.group.children.length){ mainScene3D.group.remove(mainScene3D.group.children[0]); }
+      const model = pet.stage===0 ? build3DEgg() : build3DCreature({...snapshotVisual(pet), sleeping: pet.sleeping});
+      if(pet.sick){ model.traverse(o=>{ if(o.material && o.material.color){ o.material.color.multiplyScalar(.6); } }); }
+      mainScene3D.group.add(model);
+      mainScene3D.model = model;
+      mainScene3D.ground.material.color = seededHslColor((pet.bgSeed||1)+7, .45, .32);
+      mainScene3D.scene.background = seededHslColor((pet.bgSeed||1)+3, .5, pet.sleeping?.08:.18);
+      mainScene3D.scene.fog = new THREE.Fog(mainScene3D.scene.background.getHex(), 6, 13);
+    }
+  }
+
   loadPet().then(()=>{
     setInterval(()=>tick(true), TICK_MS);
     setInterval(()=>{ if(pet.alive && pet.stage>0){ render(); } }, 550); // idle animation refresh
@@ -2820,7 +3269,8 @@ body{padding:0;align-items:stretch;}
 })();
 </script>
 <script>
-  // registro mi service worker, así la app se puede instalar de verdad (lo necesito para el APK)
+  // registro mi service worker, así "Añadir a pantalla de inicio" crea un acceso directo de verdad
+  // (con mi icono y sin barra del navegador), no solo un marcador cualquiera del navegador
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
       navigator.serviceWorker.register('sw.js').catch(()=>{ /* si falla, la app sigue funcionando igual, solo sin caché offline */ });
