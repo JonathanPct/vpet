@@ -119,12 +119,6 @@
   .agebadge{font-size:11px;color:var(--muted);font-weight:700;}
   .topbar-right{display:flex;align-items:center;gap:10px;}
   .mutebtn{font-size:15px;cursor:pointer;user-select:none;line-height:1;}
-  .installbtn{
-    font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;color:var(--luz);
-    background:rgba(125,255,179,.12);border:1px solid rgba(125,255,179,.4);
-    border-radius:20px;padding:5px 11px;cursor:pointer;
-  }
-  .installbtn:active{transform:scale(.95);}
   .screen-bezel{
     position:relative;border-radius:26px;padding:16px;isolation:isolate;
     background:
@@ -486,7 +480,6 @@ body{padding:0;align-items:stretch;}
   <div class="topbar">
     <div class="brand"><span class="rune"></span>BYTE<span>MON</span><span class="rune" style="animation-delay:1.2s"></span></div>
     <div class="topbar-right">
-      <button id="btnInstall" class="installbtn" style="display:none;">⬇️ Instalar</button>
       <span id="btnMute" class="mutebtn" role="button" aria-label="Silenciar sonido" tabindex="0">🔊</span>
       <div class="agebadge" id="ageBadge">Edad: 0h</div>
     </div>
@@ -893,14 +886,7 @@ body{padding:0;align-items:stretch;}
     if(!('Notification' in window) || Notification.permission!=='granted') return;
     if(!document.hidden) return; // si estoy mirando la app ahora mismo, ya lo veo en pantalla, no hace falta el aviso
     const body = pet.name+' tiene hambre — dale de comer 🍖';
-    if(navigator.serviceWorker && navigator.serviceWorker.ready){
-      navigator.serviceWorker.ready.then(reg=>{
-        if(reg && reg.showNotification) reg.showNotification('BYTEMON', {body, icon:'icon-192.png', tag:'hambre'});
-        else new Notification('BYTEMON', {body});
-      }).catch(()=>{ try{ new Notification('BYTEMON', {body}); }catch(e){} });
-    } else {
-      try{ new Notification('BYTEMON', {body}); }catch(e){}
-    }
+    try{ new Notification('BYTEMON', {body}); }catch(e){}
   }
 
   function computePath(){
@@ -1536,7 +1522,7 @@ body{padding:0;align-items:stretch;}
     document.body.style.overflow = has ? 'hidden' : '';
   }
 
-  // en el APK, el botón "atrás" de Android dispara un popstate; si tengo un menú abierto,
+  // si el navegador dispara un "atrás" (botón físico, gesto, o el de la propia app) y tengo un menú abierto,
   // lo cierro yo en vez de dejar que el sistema se salga de la app entera
   window.addEventListener('popstate', ()=>{
     const modalRoot = document.getElementById('modalRoot');
@@ -3238,9 +3224,30 @@ body{padding:0;align-items:stretch;}
   }
   window.addEventListener('resize', ()=>{ clearTimeout(mainScene3D&&mainScene3D._rT); resizeMainScene3D(); });
 
+  let usedThreeFallback = false;
+  function render2DFallback(){
+    // si el 3D no está disponible por lo que sea (sin conexión al CDN, WebGL no soportado...),
+    // no dejo la pantalla en blanco: vuelvo al dibujo en pixel art de toda la vida, que no depende de nada externo
+    if(!usedThreeFallback){
+      usedThreeFallback = true;
+      const aspect = window.innerHeight / window.innerWidth;
+      screenCanvas.width = GRID * CELL_PX;
+      screenCanvas.height = Math.max(screenCanvas.width, Math.round(GRID * CELL_PX * aspect));
+      screenCanvas.style.imageRendering = 'pixelated';
+    }
+    useCanvas(screenCanvas);
+    if(pet.stage===0) drawEgg(pet.frame, pet.bgSeed);
+    else drawCreature(pet);
+    useScreenCanvas();
+  }
+  let threeFailedOnce = false;
   function update3DMainScene(){
-    if(typeof THREE === 'undefined') return; // sin conexión no puedo cargar el motor 3D, la app sigue funcionando igual, solo sin la vista 3D
-    if(!mainScene3D) initMainScene3D();
+    if(typeof THREE === 'undefined'){ render2DFallback(); return; }
+    if(!mainScene3D && !threeFailedOnce){
+      try{ initMainScene3D(); }
+      catch(e){ threeFailedOnce = true; console.error('No pude iniciar el visor 3D, uso el pixel art de siempre:', e); }
+    }
+    if(!mainScene3D){ render2DFallback(); return; }
     const sig = [pet.stage, pet.hue, pet.bodyShape, pet.featureType, pet.eyeStyle, pet.pattern, pet.sick, pet.sleeping, pet.bgSeed].join('|');
     if(sig !== mainSceneSignature){
       mainSceneSignature = sig;
@@ -3262,35 +3269,12 @@ body{padding:0;align-items:stretch;}
 })();
 </script>
 <script>
-  // registro mi service worker, así la app se puede instalar de verdad (lo necesito para el APK)
+  // registro mi service worker, así "Añadir a pantalla de inicio" crea un acceso directo de verdad
+  // (con mi icono y sin barra del navegador), no solo un marcador cualquiera del navegador
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
       navigator.serviceWorker.register('sw.js').catch(()=>{ /* si falla, la app sigue funcionando igual, solo sin caché offline */ });
     });
-  }
-
-  // capturo el aviso de instalación del propio navegador para lanzarlo yo desde mi botón,
-  // así no dependo de que la persona encuentre la opción escondida en el menú de Chrome
-  let deferredInstallPrompt = null;
-  const installBtn = document.getElementById('btnInstall');
-  window.addEventListener('beforeinstallprompt', (e)=>{
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    if(installBtn) installBtn.style.display = 'inline-block';
-  });
-  if(installBtn){
-    installBtn.addEventListener('click', async ()=>{
-      if(!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
-      installBtn.style.display = 'none';
-    });
-  }
-  // si ya la tengo instalada (o abierta como app independiente), no hace falta mostrar el botón
-  window.addEventListener('appinstalled', ()=>{ if(installBtn) installBtn.style.display = 'none'; });
-  if(window.matchMedia('(display-mode: standalone)').matches && installBtn){
-    installBtn.style.display = 'none';
   }
 </script>
 </body>
