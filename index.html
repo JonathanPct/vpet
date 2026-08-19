@@ -244,6 +244,15 @@
     box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:30;max-width:88vw;text-align:center;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+  .float-particle{
+    position:fixed;top:45%;font-size:26px;z-index:25;pointer-events:none;
+    animation:floatUp 1.4s ease-out forwards;
+  }
+  @keyframes floatUp{
+    0%{opacity:0;transform:translateY(0) scale(.5);}
+    15%{opacity:1;transform:translateY(-10px) scale(1.15);}
+    100%{opacity:0;transform:translateY(-90px) scale(1);}
+  }
   .modal-backdrop{
     position:fixed;inset:0;background:rgba(5,6,10,.7);display:flex;align-items:flex-start;justify-content:center;
     padding:20px;padding-top:max(20px, env(safe-area-inset-top));z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch;
@@ -841,6 +850,7 @@ body{padding:0;align-items:stretch;}
       bgSeed: Math.floor(Math.random()*4294967295),
       dungeonFloor:1, dungeonDefeated:[],
       notifsOn:false, notifiedHungerLow:false,
+      lastMistakeTick:-999, lastGoodTick:-999,
       lastSaved: Date.now(), frame:0
     };
   }
@@ -882,6 +892,16 @@ body{padding:0;align-items:stretch;}
     t.classList.add('show');
     clearTimeout(showToast._h);
     showToast._h = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  function spawnFloatingEmoji(emoji){
+    // una partícula que sube y se desvanece, centrada en la pantalla, para acompañar caricias/regaños
+    const el = document.createElement('div');
+    el.className = 'float-particle';
+    el.textContent = emoji;
+    el.style.left = (46 + Math.random()*8) + '%';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 1400);
   }
 
   function sendHungerNotification(){
@@ -1025,6 +1045,7 @@ body{padding:0;align-items:stretch;}
   }
 
   async function playEvolutionCinematic(pre, post, title, subtitle){
+    pet.lastGoodTick = pet.ticks;
     cinematicActive = true;
     const flash = document.getElementById('cineFlash');
     const el = document.createElement('div');
@@ -1101,6 +1122,7 @@ body{padding:0;align-items:stretch;}
       });
       const best = STAT_KEYS.reduce((a,b,i)=>gains[i]>gains[STAT_KEYS.indexOf(a)]?b:a, STAT_KEYS[0]);
       showToast('¡'+pet.name+' subió a nivel '+pet.level+'! ('+STAT_LABEL[best]+' +'+gains[STAT_KEYS.indexOf(best)]+')');
+      pet.lastGoodTick = pet.ticks;
     }
   }
   function computeAffinity(){
@@ -1160,11 +1182,11 @@ body{padding:0;align-items:stretch;}
 
       // aquí cuento los fallos de cuidado, solo una vez cada vez que la barra toca fondo
       const flags = pet.lastMistakeFlags;
-      if(pet.sac<=0 && !flags.sac){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.sac=true; sfx('mistake'); }
+      if(pet.sac<=0 && !flags.sac){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.sac=true; sfx('mistake'); pet.lastMistakeTick=pet.ticks; }
       if(pet.sac>10) flags.sac=false;
-      if(pet.happy<=0 && !flags.happy){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.happy=true; sfx('mistake'); }
+      if(pet.happy<=0 && !flags.happy){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.happy=true; sfx('mistake'); pet.lastMistakeTick=pet.ticks; }
       if(pet.happy>10) flags.happy=false;
-      if(pet.hyg<=0 && !flags.hyg){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.hyg=true; sfx('mistake'); }
+      if(pet.hyg<=0 && !flags.hyg){ pet.mistakes++; pet.health=clamp(pet.health-10); flags.hyg=true; sfx('mistake'); pet.lastMistakeTick=pet.ticks; }
       if(pet.hyg>10) flags.hyg=false;
 
       if(pet.health<=0 && !pet.sick){ pet.sick=true; pet.sickTicks=0; }
@@ -1827,7 +1849,7 @@ body{padding:0;align-items:stretch;}
             s.p2.hp = Math.min(100, Math.max(0, s.p2.hp - r.dmgToB + r.healB));
             s.log.push(s.p1.name+' usó '+s.p1.move+' · '+s.p2.name+' usó '+s.p2.move+' — '+r.text);
             s.p1.move=null; s.p2.move=null; s.turnOf=1;
-            if(s.p1.hp<=0 || s.p2.hp<=0){ sfx('win'); if(s.p2.hp<=0){ gainXp(6); savePet(); } }
+            if(s.p1.hp<=0 || s.p2.hp<=0){ sfx('win'); if(s.p2.hp<=0){ gainXp(6); pet.lastGoodTick=pet.ticks; savePet(); } }
             renderLocalBattle();
           }
         };
@@ -2074,6 +2096,7 @@ body{padding:0;align-items:stretch;}
           if(s.p1.hp<=0 || s.m.hp<=0){
             if(s.m.hp<=0){
               sfx('win');
+              pet.lastGoodTick = pet.ticks;
               const rew = dungeonRewards(s.m);
               gainXp(rew.xp);
               applyMonsterTypeReward(s.m.type, rew.statPts);
@@ -3252,22 +3275,103 @@ body{padding:0;align-items:stretch;}
 
     mainScene3D = { renderer, scene, camera, group, ground, decor, camDist, raf:null, dragging:false, lastX:0, lastY:0, rotY:0.35, rotX:0, bobT:0, pinchDist:null };
 
-    function onDown(x,y){ mainScene3D.dragging=true; mainScene3D.lastX=x; mainScene3D.lastY=y; }
+    // ---- acariciar / regañar: distingo un gesto real de pasar el dedo sobre la mascota
+    // de simplemente arrastrar para girar la cámara — depende de dónde empiece el toque ----
+    const raycaster = new THREE.Raycaster();
+    let tapState = { x:0, y:0, t:0, onPet:false, strokeDist:0, lastParticleAt:0 };
+    let lastPetTime = 0, lastScoldTime = 0;
+    const STROKE_THRESHOLD = 42; // píxeles que hay que recorrer sobre ella para que cuente como caricia de verdad
+    function hitsPet(x,y){
+      if(!mainScene3D.model) return false;
+      const rect = canvasEl.getBoundingClientRect();
+      const ndc = { x:((x-rect.left)/rect.width)*2-1, y:-((y-rect.top)/rect.height)*2+1 };
+      raycaster.setFromCamera(ndc, camera);
+      return raycaster.intersectObject(mainScene3D.group, true).length>0;
+    }
+    function tapDown(x,y){
+      tapState = { x, y, t:performance.now(), onPet: hitsPet(x,y), strokeDist:0, lastParticleAt:0 };
+    }
+    function tapMove(x,y){
+      if(!tapState.onPet) return;
+      const dx=x-tapState.x, dy=y-tapState.y;
+      tapState.strokeDist += Math.hypot(dx,dy);
+      tapState.x=x; tapState.y=y;
+      // mientras arrastro el dedo por encima le saco alguna chispita, para que se note el gesto en curso
+      if(tapState.strokeDist - tapState.lastParticleAt > 22){
+        tapState.lastParticleAt = tapState.strokeDist;
+        spawnFloatingEmoji('✨');
+      }
+    }
+    function tapUp(){
+      if(pet.stage===0 || !pet.alive || !tapState.onPet) return;
+      const heldMs = performance.now() - tapState.t;
+      if(tapState.strokeDist >= STROKE_THRESHOLD) doPositiveInteraction();
+      else if(heldMs >= 480) doNegativeInteraction();
+      // un toque cortito sin arrastre real ya no cuenta como nada — quiero un gesto de verdad
+    }
+    function recentGood(){ return (pet.ticks - (pet.lastGoodTick!=null?pet.lastGoodTick:-999)) <= 15; }
+    function recentMistake(){ return (pet.ticks - (pet.lastMistakeTick!=null?pet.lastMistakeTick:-999)) <= 15; }
+    function doPositiveInteraction(){
+      // el gesto de acariciar cambia de significado según lo que haya pasado de verdad hace poco
+      const now = Date.now();
+      if(now - lastPetTime < 2200) return;
+      lastPetTime = now;
+      let gain, emoji, sound, msg;
+      if(recentGood()){
+        gain=5; emoji='🎉'; sound='win';
+        msg = '¡Felicidades, '+pet.name+'! Estás orgulloso de ella 🎉';
+      } else if(pet.sick || pet.sac<=25 || pet.happy<=30){
+        gain=4; emoji='🤗'; sound='heal';
+        msg = 'Consuelas a '+pet.name+' — se siente un poco mejor 🤗';
+      } else {
+        gain=3; emoji='💚'; sound='tap';
+        msg = pet.name+' disfruta las caricias 💚';
+      }
+      pet.happy = clamp(pet.happy + gain);
+      savePet();
+      sfx(sound);
+      spawnFloatingEmoji(emoji);
+      showToast(msg);
+    }
+    function doNegativeInteraction(){
+      // solo dejo regañar si de verdad ha hecho algo mal hace poco — si no, no tiene sentido y no hago nada al ánimo
+      const now = Date.now();
+      if(now - lastScoldTime < 2200) return;
+      lastScoldTime = now;
+      if(recentMistake()){
+        pet.happy = clamp(pet.happy - 2);
+        savePet();
+        sfx('hit');
+        spawnFloatingEmoji('💢');
+        showToast(pet.name+' entiende que algo estuvo mal 😟');
+      } else {
+        sfx('tap');
+        spawnFloatingEmoji('❓');
+        showToast(pet.name+' no ha hecho nada malo ahora mismo');
+      }
+    }
+
+    function onDown(x,y){ mainScene3D.dragging=true; mainScene3D.lastX=x; mainScene3D.lastY=y; tapDown(x,y); }
     function onMove(x,y){
       if(!mainScene3D || !mainScene3D.dragging) return;
+      if(tapState.onPet){
+        // empecé el toque justo sobre ella: esto es una caricia, no giro la cámara mientras dure
+        tapMove(x,y);
+        return;
+      }
       const dx=x-mainScene3D.lastX, dy=y-mainScene3D.lastY;
       mainScene3D.rotY += dx*0.008;
       mainScene3D.rotX = Math.max(-0.4, Math.min(0.4, mainScene3D.rotX + dy*0.008));
       mainScene3D.lastX=x; mainScene3D.lastY=y;
     }
-    function onUp(){ if(mainScene3D) mainScene3D.dragging=false; }
+    function onUp(x,y){ if(mainScene3D) mainScene3D.dragging=false; if(x!=null) tapUp(); }
     function applyZoom(delta){
       // acerco o alejo la cámara sin dejar que atraviese a la mascota ni se vaya demasiado lejos
       mainScene3D.camDist = Math.max(2.4, Math.min(9.5, mainScene3D.camDist + delta));
     }
     canvasEl.addEventListener('mousedown', e=>onDown(e.clientX,e.clientY));
     window.addEventListener('mousemove', e=>onMove(e.clientX,e.clientY));
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mouseup', e=>onUp(e.clientX,e.clientY));
     canvasEl.addEventListener('wheel', e=>{ e.preventDefault(); applyZoom(e.deltaY*0.003); }, {passive:false});
     canvasEl.addEventListener('touchstart', e=>{
       if(e.touches.length===2){
@@ -3288,7 +3392,11 @@ body{padding:0;align-items:stretch;}
         const t=e.touches[0]; onMove(t.clientX,t.clientY);
       }
     }, {passive:true});
-    canvasEl.addEventListener('touchend', e=>{ if(e.touches.length<2) mainScene3D.pinchDist=null; onUp(); });
+    canvasEl.addEventListener('touchend', e=>{
+      if(e.touches.length<2) mainScene3D.pinchDist=null;
+      const t = e.changedTouches && e.changedTouches[0];
+      onUp(t?t.clientX:null, t?t.clientY:null);
+    });
 
     resizeMainScene3D();
 
