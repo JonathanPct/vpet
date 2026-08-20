@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
-<!-- Solo necesito esto si subo el archivo fuera de Claude (ver mis notas al final del código) -->
+<!-- Solo necesito esto si subo el archivo a mi propio hosting (ver mis notas al final del código) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -540,8 +540,8 @@ body{padding:0;align-items:stretch;}
 <script>
 (function(){
   // =======================================================================
-  // Esto es lo que tengo que rellenar si algún día alojo esto fuera de Claude
-  // Si lo abro dentro de Claude no toco nada, usa su propio almacenamiento.
+  // Esto es lo que tengo que rellenar si algún día alojo esto en mi propio hosting
+  // Si lo abro aquí, en este entorno de pruebas, no toco nada, usa su propio almacenamiento.
   // Si lo subo a mi hosting (Netlify, GitHub Pages...), pongo aquí los datos
   // de mi proyecto Firebase gratuito (ya lo tengo hecho, es el "vpet")
   // =======================================================================
@@ -555,13 +555,13 @@ body{padding:0;align-items:stretch;}
   };
 
   // ---------- cómo guardo los datos ----------
-  // Dentro de Claude uso window.storage, ya viene separado por usuario solo.
-  // Si lo tengo alojado fuera, uso Firestore + login anónimo: cada móvil o
+  // Si el entorno donde lo estoy probando ya trae su propio almacenamiento (window.storage),
+  // lo uso directamente — viene separado por usuario solo, sin que tenga que montar nada.
+  // Si lo tengo alojado por mi cuenta, uso Firestore + login anónimo: cada móvil o
   // navegador saca su propio uid, así mis datos nunca se mezclan entre
-  // dispositivos. Lo "shared" (arena, ranking) sí lo ve todo el mundo,
-  // igual que pasaba dentro de Claude.
+  // dispositivos. Lo "shared" (arena, ranking) sí lo ve todo el mundo, igual en los dos casos.
   const CloudAdapter = (function(){
-    const hasClaudeStorage = typeof window !== 'undefined' && !!window.storage;
+    const hasBuiltInStorage = typeof window !== 'undefined' && !!window.storage;
     let fbReady = null;
     let uid = null;
 
@@ -587,7 +587,7 @@ body{padding:0;align-items:stretch;}
     }
 
     async function get(key, shared){
-      if(hasClaudeStorage){
+      if(hasBuiltInStorage){
         try{ return await window.storage.get(key, !!shared); }catch(e){ return null; }
       }
       const ok = await initFirebase();
@@ -601,7 +601,7 @@ body{padding:0;align-items:stretch;}
     }
 
     async function set(key, value, shared){
-      if(hasClaudeStorage){
+      if(hasBuiltInStorage){
         try{ return await window.storage.set(key, value, !!shared); }catch(e){ return null; }
       }
       const ok = await initFirebase();
