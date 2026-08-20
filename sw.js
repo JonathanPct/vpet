@@ -2,7 +2,7 @@
 // red primero (v2) — pero se me quedó un fallo: si la red fallaba en algo que nunca había
 // guardado, devolvía "nada" en vez de una respuesta válida, y eso rompía el service worker
 // entero con un error de consola. Lo arreglo asegurándome de devolver SIEMPRE algo válido,
-// y de paso dejo de tocar peticiones a webs externas (Firebase, fuentes, Three.js) — esas
+// y de paso dejo de tocar peticiones a webs externas (Firebase, fuentes, Three.js)
 // las dejo pasar tal cual, sin meterme; solo gestiono caché de mis propios archivos.
 const CACHE_NAME = 'bytemon-cache-v3'; // subo el número otra vez, para forzar que se borre la v2 rota
 const APP_SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
