@@ -3316,15 +3316,15 @@ body{padding:0;align-items:stretch;}
       const now = Date.now();
       if(now - lastPetTime < 2200) return;
       lastPetTime = now;
-      let gain, emoji, sound, msg;
+      let gain, emoji, sound, msg, reactionKind;
       if(recentGood()){
-        gain=5; emoji='🎉'; sound='win';
+        gain=5; emoji='🎉'; sound='win'; reactionKind='praise';
         msg = '¡Felicidades, '+pet.name+'! Estás orgulloso de ella 🎉';
       } else if(pet.sick || pet.sac<=25 || pet.happy<=30){
-        gain=4; emoji='🤗'; sound='heal';
+        gain=4; emoji='🤗'; sound='heal'; reactionKind='comfort';
         msg = 'Consuelas a '+pet.name+' — se siente un poco mejor 🤗';
       } else {
-        gain=3; emoji='💚'; sound='tap';
+        gain=3; emoji='💚'; sound='tap'; reactionKind='pet';
         msg = pet.name+' disfruta las caricias 💚';
       }
       pet.happy = clamp(pet.happy + gain);
@@ -3332,6 +3332,7 @@ body{padding:0;align-items:stretch;}
       sfx(sound);
       spawnFloatingEmoji(emoji);
       showToast(msg);
+      triggerReaction(reactionKind);
     }
     function doNegativeInteraction(){
       // solo dejo regañar si de verdad ha hecho algo mal hace poco — si no, no tiene sentido y no hago nada al ánimo
@@ -3344,10 +3345,12 @@ body{padding:0;align-items:stretch;}
         sfx('hit');
         spawnFloatingEmoji('💢');
         showToast(pet.name+' entiende que algo estuvo mal 😟');
+        triggerReaction('scold');
       } else {
         sfx('tap');
         spawnFloatingEmoji('❓');
         showToast(pet.name+' no ha hecho nada malo ahora mismo');
+        triggerReaction('noreason');
       }
     }
 
@@ -3400,29 +3403,122 @@ body{padding:0;align-items:stretch;}
 
     resizeMainScene3D();
 
+    // ---- lo que hace sola cuando no la toco: cada poco elige una conducta nueva y la mantiene un rato ----
+    const IDLE_POOL_ACTIVE = ['pasear','jugar','saltar','girar','bailar','pasear','estirarse'];
+    const IDLE_POOL_CALMA = ['quieta','estirarse','oler','quieta','pasear'];
+    function pickIdleBehavior(mood){
+      const pool = (mood==='triste'||mood==='cansada'||mood==='enferma') ? IDLE_POOL_CALMA
+                 : (mood==='euforica'||mood==='feliz') ? IDLE_POOL_ACTIVE
+                 : ['pasear','jugar','oler','estirarse','girar','quieta'];
+      return pool[Math.floor(Math.random()*pool.length)];
+    }
+    function updateIdleBehavior(model, mood, now){
+      if(!mainScene3D.idle){
+        mainScene3D.idle = { behavior:'quieta', startAt:now, durMs:3000, walkFrom:{x:0,z:0}, walkTo:{x:0,z:0} };
+      }
+      const idle = mainScene3D.idle;
+      const elapsed = now - idle.startAt;
+      if(elapsed >= idle.durMs){
+        idle.behavior = pickIdleBehavior(mood);
+        idle.startAt = now;
+        idle.durMs = 3200 + Math.random()*4600; // cada conducta dura entre ~3 y ~8 segundos
+        if(idle.behavior==='pasear'){
+          idle.walkFrom = { x: model.position.x, z: model.position.z };
+          const angle = Math.random()*Math.PI*2, dist = .5+Math.random()*1.2;
+          idle.walkTo = { x: Math.cos(angle)*dist, z: Math.sin(angle)*dist };
+        }
+      }
+      let extraRotY=0, extraScale=1, bobBoost=1;
+      const b = idle.behavior, el = now - idle.startAt;
+      if(b==='pasear'){
+        const walkT = Math.min(1, el/1700);
+        model.position.x = idle.walkFrom.x + (idle.walkTo.x-idle.walkFrom.x)*walkT;
+        model.position.z = idle.walkFrom.z + (idle.walkTo.z-idle.walkFrom.z)*walkT;
+        if(walkT<1){
+          const dx=idle.walkTo.x-idle.walkFrom.x, dz=idle.walkTo.z-idle.walkFrom.z;
+          extraRotY = Math.atan2(dx,dz);
+          bobBoost = 1.7;
+        }
+      } else if(b==='jugar'){
+        bobBoost = 2.1;
+        extraRotY = Math.sin(el*0.006)*.35;
+      } else if(b==='saltar'){
+        bobBoost = 1 + Math.max(0, Math.sin(el*0.006))*1.8;
+      } else if(b==='girar'){
+        extraRotY = (el/1100)*Math.PI*2;
+      } else if(b==='bailar'){
+        extraRotY = Math.sin(el*0.009)*.5;
+        bobBoost = 1.9;
+      } else if(b==='estirarse'){
+        extraScale = 1 + Math.sin(el*0.0025)*.07;
+      } else if(b==='oler'){
+        model.rotation.x += Math.sin(el*0.007)*.07;
+      }
+      model.rotation.y = extraRotY;
+      return { extraScale, bobBoost };
+    }
+
     function computeMood(p){
-      if(p.sleeping) return 'sleeping';
-      if(p.sick) return 'sick';
-      if(p.happy>=65 && p.sac>=45) return 'happy';
-      if(p.happy<=30 || p.sac<=25) return 'sad';
-      if(p.energy<=25) return 'tired';
+      if(p.sleeping) return 'dormida';
+      if(p.sick) return 'enferma';
+      if(p.happy>=85 && p.sac>=55) return 'euforica';
+      if(p.happy>=65 && p.sac>=45) return 'feliz';
+      if(p.happy<=30 || p.sac<=25) return 'triste';
+      if(p.energy<=25) return 'cansada';
+      if(p.happy<=48 && p.energy<=55) return 'aburrida';
       return 'neutral';
     }
     function applyMoodPose(model, mood, t){
-      let bobSpeed=0.03, bobAmp=0.06, eyeSquint=1, tiltZ=0, tiltX=0;
-      if(mood==='happy'){ bobSpeed=0.06; bobAmp=0.1; eyeSquint=.7; }
-      else if(mood==='sad'){ bobSpeed=0.015; bobAmp=0.025; eyeSquint=.55; tiltX=-.08; }
-      else if(mood==='tired'){ bobSpeed=0.012; bobAmp=0.02; eyeSquint=.35; tiltX=-.05; }
-      else if(mood==='sick'){ bobSpeed=0.02; bobAmp=0.03; tiltZ=Math.sin(t*1.7)*.05; eyeSquint=.6; }
-      else if(mood==='sleeping'){ bobSpeed=0.012; bobAmp=0.035; tiltX=-.15; }
+      let bobSpeed=0.03, bobAmp=0.06, eyeSquint=1, tiltZ=0, tiltX=0, wiggle=0, hop=0;
+      if(mood==='euforica'){
+        bobSpeed=0.08; bobAmp=0.09; eyeSquint=.65;
+        wiggle = Math.sin(t*3)*.06;
+        hop = Math.max(0, Math.sin(t*0.9))*0.09; // le entran saltitos de la emoción
+      } else if(mood==='feliz'){
+        bobSpeed=0.055; bobAmp=0.09; eyeSquint=.72;
+        wiggle = Math.sin(t*1.6)*.02;
+      } else if(mood==='aburrida'){
+        bobSpeed=0.018; bobAmp=0.035; eyeSquint=.85;
+        wiggle = Math.sin(t*0.5)*.045; // se balancea despacio de lado a lado, como sin ganas
+      } else if(mood==='triste'){
+        bobSpeed=0.014; bobAmp=0.022; eyeSquint=.5; tiltX=-.09;
+      } else if(mood==='cansada'){
+        bobSpeed=0.011; bobAmp=0.018; eyeSquint=.32; tiltX=-.06;
+      } else if(mood==='enferma'){
+        bobSpeed=0.02; bobAmp=0.028; tiltZ=Math.sin(t*1.7)*.05; eyeSquint=.6;
+      } else if(mood==='dormida'){
+        bobSpeed=0.011; bobAmp=0.032; tiltX=-.16;
+      }
       model.rotation.x = tiltX;
-      model.rotation.z = tiltZ;
+      model.rotation.z = tiltZ + wiggle;
       model.traverse(o=>{
-        if(o.userData && o.userData.isEye && o.userData.baseScale && mood!=='sleeping'){
+        if(o.userData && o.userData.isEye && o.userData.baseScale && mood!=='dormida'){
           o.scale.set(o.userData.baseScale.x, o.userData.baseScale.y*eyeSquint, o.userData.baseScale.z);
         }
       });
-      return {bobSpeed, bobAmp};
+      return {bobSpeed, bobAmp, hop};
+    }
+
+    // ---- reacciones rápidas: un gesto que se nota al momento cuando la acaricias, la felicitas, la consuelas o la regañas ----
+    function triggerReaction(kind){
+      if(!mainScene3D) return;
+      mainScene3D.reaction = { kind, start: performance.now() };
+    }
+    function applyReaction(model){
+      if(!mainScene3D.reaction) return {y:0, scale:1};
+      const elapsed = performance.now() - mainScene3D.reaction.start;
+      const dur = 700;
+      if(elapsed > dur){ mainScene3D.reaction = null; return {y:0, scale:1}; }
+      const p = elapsed/dur, wave = Math.sin(p*Math.PI);
+      const kind = mainScene3D.reaction.kind;
+      let extraY=0, scale=1, extraRotZ=0;
+      if(kind==='pet'){ scale = 1+wave*.07; extraRotZ = Math.sin(p*Math.PI*4)*.05; }
+      else if(kind==='praise'){ extraY = wave*.32; scale = 1+wave*.1; }
+      else if(kind==='comfort'){ extraY = wave*.12; scale = 1+wave*.04; }
+      else if(kind==='scold'){ scale = 1-wave*.1; extraY = -wave*.07; }
+      else if(kind==='noreason'){ extraRotZ = Math.sin(p*Math.PI*3)*.09; }
+      model.rotation.z += extraRotZ;
+      return { y: extraY, scale };
     }
 
     function loop(){
@@ -3430,11 +3526,18 @@ body{padding:0;align-items:stretch;}
       const modalOpen = document.getElementById('modalRoot').children.length>0;
       if(!modalOpen){
         const mood = computeMood(pet);
-        const {bobSpeed, bobAmp} = mainScene3D.model ? applyMoodPose(mainScene3D.model, mood, mainScene3D.bobT) : {bobSpeed:.03, bobAmp:.06};
+        const {bobSpeed, bobAmp, hop} = mainScene3D.model ? applyMoodPose(mainScene3D.model, mood, mainScene3D.bobT) : {bobSpeed:.03, bobAmp:.06, hop:0};
+        let bobBoost = 1, idleScale = 1;
+        if(mainScene3D.model && !mainScene3D.dragging){
+          const idleOut = updateIdleBehavior(mainScene3D.model, mood, performance.now());
+          bobBoost = idleOut.bobBoost; idleScale = idleOut.extraScale;
+        }
+        const reaction = mainScene3D.model ? applyReaction(mainScene3D.model) : {y:0, scale:1};
+        if(mainScene3D.model) mainScene3D.model.scale.setScalar(idleScale * reaction.scale);
         mainScene3D.bobT += bobSpeed;
         mainScene3D.group.rotation.y = mainScene3D.rotY; // ya no giro solo — únicamente cuando arrastras con el dedo
         mainScene3D.group.rotation.x = mainScene3D.rotX;
-        mainScene3D.group.position.y = Math.sin(mainScene3D.bobT)*bobAmp;
+        mainScene3D.group.position.y = Math.sin(mainScene3D.bobT)*bobAmp*bobBoost + hop + reaction.y;
         camera.position.z += (mainScene3D.camDist - camera.position.z) * 0.15; // zoom suavizado, sin saltos bruscos
         camera.lookAt(0, .3, 0);
         renderer.render(scene, camera);
