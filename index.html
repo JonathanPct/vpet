@@ -284,7 +284,8 @@
     max-width:none;width:100%;height:100%;max-height:none;border-radius:0;border:none;padding:0;
     margin:0;box-shadow:none;overflow:hidden;background:transparent;display:flex;flex-direction:column;
   }
-  #dgCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  #dg2dBg{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0;}
+  #dgCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1;background:transparent;}
   .dg-topbar{
     position:absolute;top:0;left:0;right:0;z-index:3;padding:calc(env(safe-area-inset-top) + 12px) 14px 10px;
     display:flex;justify-content:space-between;align-items:center;
@@ -1865,7 +1866,7 @@ body{padding:0;align-items:stretch;}
     const active = s.turnOf===1?s.p1:s.p2;
     const finished = s.p1.hp<=0 || s.p2.hp<=0;
     c.innerHTML = `
-      <canvas id="dgCanvas"></canvas>
+      <canvas id="dg2dBg"></canvas><canvas id="dgCanvas"></canvas>
       <div class="dg-topbar">
         <button class="close-x" id="dgBack">✕</button>
         <div></div><div></div>
@@ -1895,7 +1896,7 @@ body{padding:0;align-items:stretch;}
     `;
     document.getElementById('dgBack').onclick = ()=>{ currentSetTab && currentSetTab('local'); };
     stopDungeonScene();
-    initDungeonScene();
+    initDungeonScene('arena');
     setDungeonFighters({...s.p1, stage:s.p1.stage||3, sick:false, sleeping:false}, {...s.p2, stage:s.p2.stage||3, sick:false, sleeping:false});
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
@@ -2035,10 +2036,166 @@ body{padding:0;align-items:stretch;}
       dungeonScene3D = null;
     }
   }
+  // ---------- el fondo de las peleas lo pinto en 2D, bien detallado, y dejo el cielo del 3D transparente
+  // encima — así los luchadores siguen siendo 3D de verdad pero el paisaje de fondo no se queda plano ----------
+  function draw2DBattleBackdrop(canvas, theme){
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = window.innerWidth*dpr; canvas.height = window.innerHeight*dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr,dpr);
+    const w = window.innerWidth, h = window.innerHeight;
+    const rand = mulberry32(theme==='mazmorra'?77:33);
+    if(theme==='mazmorra'){
+      const sky = ctx.createLinearGradient(0,0,0,h);
+      sky.addColorStop(0,'#0b070c'); sky.addColorStop(.55,'#241019'); sky.addColorStop(.8,'#4a2418'); sky.addColorStop(1,'#7a3a22');
+      ctx.fillStyle = sky; ctx.fillRect(0,0,w,h);
+      // arco de piedra al fondo, como la entrada a una cámara mas profunda
+      ctx.fillStyle = 'rgba(15,9,10,.85)';
+      const archY = h*.42, archW = w*.62, archX = w*.5;
+      ctx.beginPath();
+      ctx.moveTo(archX-archW/2, h*.7);
+      ctx.lineTo(archX-archW/2, archY+40);
+      ctx.quadraticCurveTo(archX-archW/2, archY, archX, archY);
+      ctx.quadraticCurveTo(archX+archW/2, archY, archX+archW/2, archY+40);
+      ctx.lineTo(archX+archW/2, h*.7);
+      ctx.fill();
+      // estalactitas colgando arriba
+      ctx.fillStyle = '#1c1113';
+      for(let i=0;i<14;i++){
+        const x = (i/13)*w + (rand()-.5)*30;
+        const len = 18+rand()*46;
+        ctx.beginPath();
+        ctx.moveTo(x-14,0); ctx.lineTo(x+14,0); ctx.lineTo(x,len); ctx.closePath(); ctx.fill();
+      }
+      // paredes laterales con textura de bloques, en perspectiva hacia el centro
+      [-1,1].forEach(side=>{
+        ctx.fillStyle = 'rgba(28,16,17,.9)';
+        ctx.beginPath();
+        ctx.moveTo(side<0?0:w, h*.2);
+        ctx.lineTo(side<0?0:w, h*.85);
+        ctx.lineTo(archX+side*archW*.55, h*.72);
+        ctx.lineTo(archX+side*archW*.5, archY+30);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth=1.5;
+        for(let r=0;r<8;r++){
+          const yy = h*.22 + r*(h*.6/8);
+          ctx.beginPath(); ctx.moveTo(side<0?0:w, yy); ctx.lineTo(archX+side*archW*.52, yy*.55+archY*.4); ctx.stroke();
+        }
+      });
+      // manchas de luz calida de las antorchas, para que combine con las luces 3D reales
+      [-1,1].forEach(side=>{
+        const gx = w/2+side*w*.24, gy = h*.55;
+        const glow = ctx.createRadialGradient(gx,gy,4,gx,gy,120);
+        glow.addColorStop(0,'rgba(255,170,90,.35)'); glow.addColorStop(1,'rgba(255,170,90,0)');
+        ctx.fillStyle = glow; ctx.fillRect(gx-120,gy-120,240,240);
+      });
+    } else if(theme==='arena'){
+      // arena de piedra con arco central enmarcando un atardecer entre montañas, como las referencias que me diste
+      const sky = ctx.createLinearGradient(0,0,0,h*.62);
+      sky.addColorStop(0,'#2a2550'); sky.addColorStop(.35,'#6a4a78'); sky.addColorStop(.62,'#c98a6a'); sky.addColorStop(1,'#ffcf9a');
+      ctx.fillStyle = sky; ctx.fillRect(0,0,w,h*.62);
+      // sol grande y difuso justo en el centro del arco
+      const sun = ctx.createRadialGradient(w*.5,h*.42,10,w*.5,h*.42,w*.22);
+      sun.addColorStop(0,'rgba(255,240,210,.95)'); sun.addColorStop(1,'rgba(255,240,210,0)');
+      ctx.fillStyle = sun; ctx.fillRect(w*.5-w*.22,h*.42-w*.22,w*.44,w*.44);
+      // montañas lejanas, dos capas
+      ctx.fillStyle = 'rgba(90,70,110,.55)';
+      ctx.beginPath(); ctx.moveTo(0,h*.6);
+      for(let x=0;x<=w;x+=w/12){ ctx.lineTo(x, h*.58 - Math.abs(Math.sin(x*.015+1))*h*.1); }
+      ctx.lineTo(w,h*.62); ctx.lineTo(0,h*.62); ctx.fill();
+      ctx.fillStyle = 'rgba(60,45,75,.7)';
+      ctx.beginPath(); ctx.moveTo(0,h*.62);
+      for(let x=0;x<=w;x+=w/16){ ctx.lineTo(x, h*.6 - Math.abs(Math.sin(x*.022+3))*h*.075); }
+      ctx.lineTo(w,h*.62); ctx.lineTo(0,h*.62); ctx.fill();
+      // suelo de losas, en degradado calido, con las lineas de las baldosas convergiendo al centro
+      const floor = ctx.createLinearGradient(0,h*.6,0,h);
+      floor.addColorStop(0,'#5a2a2e'); floor.addColorStop(.4,'#8a3a34'); floor.addColorStop(1,'#2a1216');
+      ctx.fillStyle = floor; ctx.fillRect(0,h*.6,w,h*.4);
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.4;
+      const vanishX = w*.5, vanishY = h*.6;
+      for(let i=-8;i<=8;i++){
+        ctx.beginPath(); ctx.moveTo(vanishX, vanishY); ctx.lineTo(vanishX+i*w*.16, h); ctx.stroke();
+      }
+      for(let r=0;r<7;r++){
+        const t = r/6, yy = vanishY + t*t*(h-vanishY);
+        ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(w,yy); ctx.stroke();
+      }
+      // muros oscuros a los lados, cada uno con un arco pequeño mostrando el mismo cielo
+      const wallMat = 'rgba(20,10,16,.92)';
+      [-1,1].forEach(side=>{
+        ctx.fillStyle = wallMat;
+        ctx.fillRect(side<0?0:w*.78, 0, w*.22, h);
+        ctx.save();
+        ctx.beginPath();
+        const ax = side<0? w*.11 : w*.89, ay=h*.34, arx=w*.09, ary=h*.26;
+        ctx.ellipse(ax,ay,arx,ary,0,Math.PI,0);
+        ctx.lineTo(ax+arx, h*.62); ctx.lineTo(ax-arx, h*.62); ctx.closePath();
+        ctx.clip();
+        ctx.fillStyle = sky; ctx.fillRect(side<0?0:w*.78,0,w*.22,h);
+        ctx.fillStyle = 'rgba(60,45,75,.6)';
+        ctx.beginPath(); ctx.moveTo(side<0?0:w*.78,h*.55);
+        ctx.lineTo(side<0?w*.22:w, h*.5); ctx.lineTo(side<0?w*.22:w,h*.62); ctx.lineTo(side<0?0:w*.78,h*.62); ctx.fill();
+        ctx.restore();
+      });
+      // columnas centrales flanqueando el arco grande, con capitel
+      [-1,1].forEach(side=>{
+        const px = w*.5 + side*w*.235;
+        ctx.fillStyle = '#3a2a30';
+        ctx.fillRect(px-w*.028, h*.08, w*.056, h*.56);
+        ctx.fillStyle = '#4a3238';
+        ctx.fillRect(px-w*.042, h*.08, w*.084, h*.045);
+        ctx.fillRect(px-w*.042, h*.56, w*.084, h*.045);
+      });
+      // estandartes colgando arriba del arco central
+      [-1,-.33,.33,1].forEach(px=>{
+        ctx.fillStyle = 'rgba(120,30,30,.8)';
+        ctx.fillRect(w*.5+px*w*.16-6, 0, 12, h*.1+Math.abs(px)*h*.03);
+      });
+      // penumbra en las esquinas para dar profundidad
+      const vign = ctx.createRadialGradient(w*.5,h*.45,h*.2,w*.5,h*.45,h*.85);
+      vign.addColorStop(0,'rgba(0,0,0,0)'); vign.addColorStop(1,'rgba(0,0,0,.5)');
+      ctx.fillStyle = vign; ctx.fillRect(0,0,w,h);
+    } else {
+      // bosque: cielo de atardecer, montañas lejanas, varias filas de árboles con profundidad
+      const sky = ctx.createLinearGradient(0,0,0,h);
+      sky.addColorStop(0,'#160d24'); sky.addColorStop(.4,'#3a2050'); sky.addColorStop(.72,'#7a4a5a'); sky.addColorStop(1,'#c98a5a');
+      ctx.fillStyle = sky; ctx.fillRect(0,0,w,h);
+      // luna
+      ctx.fillStyle = 'rgba(255,250,230,.9)';
+      ctx.beginPath(); ctx.arc(w*.78, h*.18, 34, 0, Math.PI*2); ctx.fill();
+      // estrellitas
+      ctx.fillStyle = 'rgba(255,255,255,.7)';
+      for(let i=0;i<40;i++){ const x=rand()*w, y=rand()*h*.45; ctx.fillRect(x,y,1.6,1.6); }
+      // montañas lejanas
+      ctx.fillStyle = 'rgba(35,22,40,.75)';
+      ctx.beginPath(); ctx.moveTo(0,h*.62);
+      for(let x=0;x<=w;x+=w/10){ ctx.lineTo(x, h*.62 - Math.abs(Math.sin(x*.01+2))*h*.14); }
+      ctx.lineTo(w,h*.7); ctx.lineTo(0,h*.7); ctx.fill();
+      // tres filas de árboles, cada vez más cerca, oscuros y grandes
+      const rows = [ {y:h*.66, s:.55, c:'#1c2a1e', n:16}, {y:h*.74, s:.8, c:'#152018', n:11}, {y:h*.85, s:1.15, c:'#0e1710', n:7} ];
+      rows.forEach(row=>{
+        for(let i=0;i<row.n;i++){
+          const x = (i/(row.n-1))*w*1.15 - w*.07 + (rand()-.5)*30;
+          const th = 70*row.s, tw=44*row.s;
+          ctx.fillStyle = row.c;
+          ctx.fillRect(x-4*row.s, row.y-th*.3, 8*row.s, th*.3);
+          ctx.beginPath();
+          ctx.moveTo(x, row.y-th); ctx.lineTo(x-tw/2, row.y-th*.35); ctx.lineTo(x+tw/2, row.y-th*.35); ctx.closePath(); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(x, row.y-th*.72); ctx.lineTo(x-tw*.4, row.y-th*.1); ctx.lineTo(x+tw*.4, row.y-th*.1); ctx.closePath(); ctx.fill();
+        }
+      });
+      // niebla suave pegada al suelo
+      const mist = ctx.createLinearGradient(0,h*.8,0,h);
+      mist.addColorStop(0,'rgba(200,200,220,0)'); mist.addColorStop(1,'rgba(200,200,220,.18)');
+      ctx.fillStyle = mist; ctx.fillRect(0,h*.8,w,h*.2);
+    }
+  }
+
   function buildDungeonEnvironment(scene){
-    // suelo de piedra, un par de columnas con antorchas y un cielo de mazmorra oscuro — mismo estilo en bloques que el resto
-    scene.background = new THREE.Color(0x140d10);
-    scene.fog = new THREE.Fog(0x140d10, 7, 15);
+    // dejo el fondo transparente a propósito — el paisaje detallado lo pinto aparte, en 2D, justo detrás
+    scene.background = null;
+    scene.fog = null;
     const ground = new THREE.Mesh(new THREE.CircleGeometry(9,28), new THREE.MeshStandardMaterial({color:0x3a2a24, roughness:.95, flatShading:true}));
     ground.rotation.x = -Math.PI/2; ground.position.y = -1.2;
     scene.add(ground);
@@ -2056,10 +2213,13 @@ body{padding:0;align-items:stretch;}
     });
     scene.add(new THREE.HemisphereLight(0xaa8866, 0x150a10, .6));
   }
-  function initDungeonScene(){
+  function initDungeonScene(theme){
+    theme = theme || 'arena';
+    const bgCanvas = document.getElementById('dg2dBg');
+    if(bgCanvas) draw2DBattleBackdrop(bgCanvas, theme);
     const canvasEl = document.getElementById('dgCanvas');
     if(!canvasEl) return;
-    const renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true });
+    const renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true, alpha:true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     const scene = new THREE.Scene();
@@ -2077,6 +2237,8 @@ body{padding:0;align-items:stretch;}
       renderer.setSize(window.innerWidth, window.innerHeight, false);
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
+      const bg = document.getElementById('dg2dBg');
+      if(bg) draw2DBattleBackdrop(bg, theme);
     }
     window.addEventListener('resize', onResize);
     dungeonScene3D.onResize = onResize;
@@ -2189,7 +2351,7 @@ body{padding:0;align-items:stretch;}
     const rew = dungeonRewards(monster);
     const defeated = (pet.dungeonDefeated||[]).filter(f=>f!==pet.dungeonFloor);
     c.innerHTML = `
-      <canvas id="dgCanvas"></canvas>
+      <canvas id="dg2dBg"></canvas><canvas id="dgCanvas"></canvas>
       <div class="dg-topbar">
         <button class="close-x" id="dgBack">✕</button>
         <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:var(--luz);">MAZMORRA — PISO ${monster.floor}</div>
@@ -2222,7 +2384,7 @@ body{padding:0;align-items:stretch;}
     document.getElementById('startDungeon').onclick = ()=>{ sfx('tap'); startDungeonBattle(monster); };
     document.getElementById('dgViewStats').onclick = ()=>{ sfx('tap'); openInfoModal(); };
     stopDungeonScene(); // cada vez que reconstruyo el HTML se crea un <canvas> nuevo, así que el renderizador tiene que ser nuevo también
-    initDungeonScene();
+    initDungeonScene('arena');
     setDungeonFighters(pet.stage===0 ? null : snapshotVisual(pet), monster.sprite);
     c.querySelectorAll('[data-floor]').forEach(chip=>{
       chip.onclick=()=>{ sfx('tap'); startDungeonBattle(generateMonster(parseInt(chip.getAttribute('data-floor'),10))); };
@@ -2244,7 +2406,7 @@ body{padding:0;align-items:stretch;}
     if(!s) return;
     const finished = s.p1.hp<=0 || s.m.hp<=0;
     c.innerHTML = `
-      <canvas id="dgCanvas"></canvas>
+      <canvas id="dg2dBg"></canvas><canvas id="dgCanvas"></canvas>
       <div class="dg-topbar">
         <button class="close-x" id="dgBack">✕</button>
         <div></div>
@@ -2280,7 +2442,7 @@ body{padding:0;align-items:stretch;}
     document.getElementById('dgBack').onclick = ()=>{ currentSetTab && currentSetTab('local'); };
     document.getElementById('dgViewStats2').onclick = ()=>{ sfx('tap'); openInfoModal(); };
     stopDungeonScene();
-    initDungeonScene();
+    initDungeonScene('arena');
     setDungeonFighters(pet.stage===0 ? null : snapshotVisual(pet), s.m.sprite);
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
@@ -2492,7 +2654,7 @@ body{padding:0;align-items:stretch;}
     const myMoveSet = !!me.move;
     setArenaFullscreen(true);
     c.innerHTML = `
-      <canvas id="dgCanvas"></canvas>
+      <canvas id="dg2dBg"></canvas><canvas id="dgCanvas"></canvas>
       <div class="dg-topbar">
         <button class="close-x" id="dgBack">✕</button><div></div><div></div>
       </div>
@@ -2522,7 +2684,7 @@ body{padding:0;align-items:stretch;}
     `;
     document.getElementById('dgBack').onclick = ()=>{ stopBattlePoll(); stopDungeonScene(); currentSetTab && currentSetTab('online'); };
     stopDungeonScene();
-    initDungeonScene();
+    initDungeonScene('arena');
     setDungeonFighters({...doc.p1, stage:doc.p1.stage||3, sick:false, sleeping:false}, {...doc.p2, stage:doc.p2.stage||3, sick:false, sleeping:false});
     if(doc.resolvedRound>0 && lastOnlineShakeRound!==doc.resolvedRound){
       lastOnlineShakeRound = doc.resolvedRound;
@@ -2671,6 +2833,8 @@ body{padding:0;align-items:stretch;}
         <button class="status-btn" id="gameSimon">🎵 Simón dice</button>
         <button class="status-btn" id="gameBubbles">🫧 Revienta burbujas</button>
         <button class="status-btn" id="gameTiming">🎯 Toque perfecto</button>
+        <button class="status-btn" id="gameDodge">🏃 Esquiva</button>
+        <button class="status-btn" id="gameRhythm">🥁 Ritmo</button>
       </div>
     `;
     document.getElementById('gameCatch').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startCatchGame(); };
@@ -2678,6 +2842,147 @@ body{padding:0;align-items:stretch;}
     document.getElementById('gameSimon').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startSimonGame(); };
     document.getElementById('gameBubbles').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startBubblesGame(); };
     document.getElementById('gameTiming').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startTimingGame(); };
+    document.getElementById('gameDodge').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startDodgeGame(); };
+    document.getElementById('gameRhythm').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startRhythmGame(); };
+  }
+
+  function startDodgeGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Toca la mitad izquierda o derecha para esquivar. ¡Aguanta 3 golpes!</p>
+      <div class="game-hud"><span>Tiempo: <b id="dgTime">0.0</b>s</span><span>Vidas: <b id="dgLives">3</b></span></div>
+      <div class="game-area" id="dodgeArea" style="position:relative;overflow:hidden;">
+        <div id="dodgeHalfL" style="position:absolute;left:0;top:0;width:50%;height:100%;"></div>
+        <div id="dodgeHalfR" style="position:absolute;right:0;top:0;width:50%;height:100%;"></div>
+        <div id="dodgePlayer" style="position:absolute;bottom:6px;font-size:30px;transition:left .12s;">🐾</div>
+      </div>
+    `;
+    const area = document.getElementById('dodgeArea');
+    const player = document.getElementById('dodgePlayer');
+    let lane = 1; // 0 = izquierda, 1 = derecha
+    function updatePlayerPos(){ player.style.left = lane===0 ? '20%' : '65%'; }
+    updatePlayerPos();
+    let lives = 3, startTime = performance.now(), obstacles = [], spawnEvery = 900, lastSpawn = 0, over = false;
+    document.getElementById('dodgeHalfL').onclick = ()=>{ if(over) return; lane=0; updatePlayerPos(); };
+    document.getElementById('dodgeHalfR').onclick = ()=>{ if(over) return; lane=1; updatePlayerPos(); };
+    const OBS_EMOJI = ['🪨','☄️','🔥'];
+    function spawnObstacle(){
+      const obLane = Math.random()<0.5 ? 0 : 1;
+      const el = document.createElement('div');
+      el.textContent = OBS_EMOJI[Math.floor(Math.random()*OBS_EMOJI.length)];
+      el.style.cssText = 'position:absolute;top:-30px;font-size:26px;transition:none;';
+      el.style.left = obLane===0 ? '22%' : '67%';
+      area.appendChild(el);
+      obstacles.push({ el, lane:obLane, y:-30 });
+    }
+    const loop = setInterval(()=>{
+      if(over) return;
+      const now = performance.now();
+      const elapsed = (now-startTime)/1000;
+      document.getElementById('dgTime').textContent = elapsed.toFixed(1);
+      if(now-lastSpawn > spawnEvery){ lastSpawn = now; spawnObstacle(); spawnEvery = Math.max(420, spawnEvery-15); }
+      const areaH = area.clientHeight;
+      obstacles.forEach(o=>{
+        o.y += 7;
+        o.el.style.top = o.y+'px';
+        if(o.y > areaH-70 && o.y < areaH-20 && o.lane===lane && !o.hit){
+          o.hit = true;
+          lives--;
+          document.getElementById('dgLives').textContent = lives;
+          sfx('hit');
+          spawnFloatingEmoji('💥');
+          if(lives<=0){ endDodge(elapsed); }
+        }
+      });
+      obstacles = obstacles.filter(o=>{
+        if(o.y > areaH+10){ o.el.remove(); return false; }
+        return true;
+      });
+    }, 30);
+    minigameTimers.push(loop);
+    function endDodge(elapsed){
+      over = true;
+      clearInterval(loop);
+      obstacles.forEach(o=>o.el.remove());
+      const gain = Math.min(28, Math.round(elapsed*2.2));
+      finishMinigame(gain, 6, '¡'+pet.name+' aguantó '+elapsed.toFixed(1)+'s esquivando! +'+gain+' de ánimo');
+      showGameResult('🏃 Esquiva', elapsed.toFixed(1)+' segundos aguantados', gain);
+    }
+  }
+
+  function startRhythmGame(){
+    stopMinigameTimers();
+    const c = document.getElementById('gamesContent');
+    c.innerHTML = `
+      <p class="small-note" style="text-align:center;">Toca justo cuando el círculo llegue al aro. 8 golpes, encadena combo.</p>
+      <div class="game-hud"><span>Combo: <b id="rhCombo">0</b></span><span>Golpe: <b id="rhBeat">1</b>/8</span></div>
+      <div class="game-area" id="rhArea" style="display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+        <div id="rhRing" style="position:absolute;width:56px;height:56px;border-radius:50%;border:4px solid rgba(125,255,179,.5);"></div>
+        <div id="rhBall" style="position:absolute;width:22px;height:22px;border-radius:50%;background:#7dffb3;box-shadow:0 0 10px #7dffb3;"></div>
+      </div>
+    `;
+    const area = document.getElementById('rhArea');
+    let beat=0, combo=0, score=0, over=false;
+    function playBeat(){
+      if(over) return;
+      const ball = document.getElementById('rhBall');
+      const areaRect = area.getBoundingClientRect();
+      const cx = areaRect.width/2, cy = areaRect.height/2;
+      const radius = Math.min(areaRect.width, areaRect.height)*0.36;
+      const dur = 1000;
+      const start = performance.now();
+      let hitWindowOpen = true;
+      function step(){
+        if(over) return;
+        const t = (performance.now()-start)/dur;
+        if(t>=1){
+          if(hitWindowOpen){ missBeat(); }
+          return;
+        }
+        const ang = t*Math.PI*2 - Math.PI/2;
+        ball.style.left = (cx + Math.cos(ang)*radius*(1-t*0.001) - 11)+'px';
+        ball.style.top = (cy + Math.sin(ang)*radius*(1-t*0.001) - 11)+'px';
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+      area.onclick = ()=>{
+        if(!hitWindowOpen || over) return;
+        const t = (performance.now()-start)/dur;
+        const dist = Math.abs(t-0.85); // el aro está a un 85% del recorrido, cerca del punto de partida otra vez
+        hitWindowOpen = false;
+        if(dist < 0.09){
+          combo++; score += 3+combo;
+          document.getElementById('rhRing').style.borderColor = '#7dffb3';
+          spawnFloatingEmoji('🥁');
+        } else {
+          combo = 0;
+          document.getElementById('rhRing').style.borderColor = '#ff5c5c';
+        }
+        document.getElementById('rhCombo').textContent = combo;
+        sfx(dist<0.09?'tap':'hit');
+        nextBeat();
+      };
+    }
+    function missBeat(){
+      combo = 0;
+      document.getElementById('rhCombo').textContent = combo;
+      nextBeat();
+    }
+    function nextBeat(){
+      beat++;
+      if(beat>8){ endRhythm(); return; }
+      document.getElementById('rhBeat').textContent = Math.min(beat,8);
+      setTimeout(playBeat, 260);
+    }
+    nextBeat();
+    function endRhythm(){
+      over = true;
+      area.onclick = null;
+      const gain = Math.min(28, Math.round(score*0.9));
+      finishMinigame(gain, 6, '¡'+pet.name+' siguió el ritmo! +'+gain+' de ánimo');
+      showGameResult('🥁 Ritmo', score+' puntos conseguidos', gain);
+    }
   }
 
   function startBubblesGame(){
@@ -3630,7 +3935,9 @@ body{padding:0;align-items:stretch;}
     }
     function recentGood(){ return (pet.ticks - (pet.lastGoodTick!=null?pet.lastGoodTick:-999)) <= 15; }
     function recentMistake(){ return (pet.ticks - (pet.lastMistakeTick!=null?pet.lastMistakeTick:-999)) <= 15; }
+    function anyModalOpen(){ return document.getElementById('modalRoot').children.length>0; }
     function doPositiveInteraction(){
+      if(anyModalOpen()) return; // compruebo otra vez justo aquí, no solo al empezar el toque — por si el menú se abrió a mitad del gesto
       // el gesto de acariciar cambia de significado según lo que haya pasado de verdad hace poco
       const now = Date.now();
       if(now - lastPetTime < 2200) return;
@@ -3654,6 +3961,7 @@ body{padding:0;align-items:stretch;}
       triggerReaction(reactionKind);
     }
     function doNegativeInteraction(){
+      if(anyModalOpen()) return;
       // solo dejo regañar si de verdad ha hecho algo mal hace poco — si no, no tiene sentido y no hago nada al ánimo
       const now = Date.now();
       if(now - lastScoldTime < 2200) return;
