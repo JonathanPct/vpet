@@ -278,6 +278,40 @@
   .tabrow{display:flex;gap:8px;margin-bottom:14px;}
   .tabrow button{flex:1;padding:8px;}
   .tabrow button.active{background:linear-gradient(160deg,var(--luz),#2a9);color:#0a1712;}
+  /* la mazmorra se sale del molde del modal normal y ocupa toda la pantalla, como la vista principal */
+  .modal-backdrop.dg-full{padding:0;align-items:stretch;background:#000;overflow:hidden;}
+  .modal-backdrop.dg-full .modal{
+    max-width:none;width:100%;height:100%;max-height:none;border-radius:0;border:none;padding:0;
+    margin:0;box-shadow:none;overflow:hidden;background:transparent;display:flex;flex-direction:column;
+  }
+  #dgCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  .dg-topbar{
+    position:absolute;top:0;left:0;right:0;z-index:3;padding:calc(env(safe-area-inset-top) + 12px) 14px 10px;
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(rgba(5,4,10,.85),rgba(5,4,10,0));
+  }
+  .dg-topbar .close-x{position:static;color:var(--ink);}
+  .dg-hpwrap{position:absolute;top:0;left:0;right:0;z-index:3;padding:calc(env(safe-area-inset-top) + 44px) 16px 0;
+    display:flex;justify-content:space-between;gap:12px;pointer-events:none;}
+  .dg-hpside{flex:1;max-width:44%;}
+  .dg-hpside.right{text-align:right;}
+  .dg-hpname{font-size:11px;font-weight:800;color:var(--ink);text-shadow:0 1px 3px rgba(0,0,0,.8);margin-bottom:3px;}
+  .dg-hpbar{height:9px;border-radius:5px;background:rgba(0,0,0,.55);overflow:hidden;border:1px solid rgba(255,255,255,.15);}
+  .dg-hpfill{height:100%;transition:width .4s;}
+  .dg-hpside .dg-hpfill{background:linear-gradient(90deg,#5eff9e,#baffcf);}
+  .dg-hpside.right .dg-hpfill{background:linear-gradient(90deg,#ff5c5c,#ffb3b3);margin-left:auto;}
+  .dg-bottom{
+    position:absolute;left:0;right:0;bottom:0;z-index:3;
+    padding:10px 16px calc(env(safe-area-inset-bottom) + 16px);
+    background:linear-gradient(rgba(5,4,10,0),rgba(5,4,10,.92) 40%);
+  }
+  .dg-log{font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;min-height:14px;}
+  .dg-movegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .dg-result{text-align:center;font-weight:800;color:var(--ink);text-shadow:0 2px 6px rgba(0,0,0,.7);margin-bottom:10px;font-size:14px;}
+  .dg-home-panel{
+    position:absolute;left:0;right:0;bottom:0;z-index:3;padding:14px 16px calc(env(safe-area-inset-bottom) + 16px);
+    background:linear-gradient(rgba(5,4,10,0),rgba(5,4,10,.94) 35%);max-height:62vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  }
   .vs{
     position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:6px;
     margin-bottom:10px;padding:34px 14px 14px;border-radius:14px;min-height:150px;
@@ -819,6 +853,7 @@ body{padding:0;align-items:stretch;}
     return {
       stage:3, frame:0, sick:false, sleeping:false, temperament, path:senda,
       hue: Math.floor(rand()*360),
+      archetype: pickArchetype(rand),
       bodyShape: weightedPick(rand, EVO_SHAPE_OPTS, w.shape),
       featureType: weightedPick(rand, EVO_FEAT_OPTS, w.feat),
       eyeStyle: EVO_EYE_OPTS[Math.floor(rand()*EVO_EYE_OPTS.length)],
@@ -931,7 +966,7 @@ body{padding:0;align-items:stretch;}
 
   function snapshotVisual(p){
     return {stage:p.stage, frame:0, sick:false, sleeping:false, temperament:p.temperament, path:p.path,
-      hue:p.hue, bodyShape:p.bodyShape, featureType:p.featureType, eyeStyle:p.eyeStyle, pattern:p.pattern, bgSeed:p.bgSeed};
+      hue:p.hue, archetype:p.archetype, bodyShape:p.bodyShape, featureType:p.featureType, eyeStyle:p.eyeStyle, pattern:p.pattern, bgSeed:p.bgSeed};
   }
 
   let evolutionChoicePending = false;
@@ -945,6 +980,7 @@ body{padding:0;align-items:stretch;}
       speciesName: proceduralName(path, temperament, seed),
       affinity,
       hue: Math.floor(rand2()*360),
+      archetype: pickArchetype(rand2),
       bodyShape: weightedPick(rand2, EVO_SHAPE_OPTS, w.shape),
       featureType: weightedPick(rand2, EVO_FEAT_OPTS, w.feat),
       eyeStyle: EVO_EYE_OPTS[Math.floor(rand2()*EVO_EYE_OPTS.length)],
@@ -973,7 +1009,7 @@ body{padding:0;align-items:stretch;}
     candidates.forEach((c,i)=>{
       const cv = document.getElementById('evoChoiceCv'+i);
       render3DMiniPreview(cv, {stage:3, temperament, path,
-        hue:c.hue, bodyShape:c.bodyShape, featureType:c.featureType, eyeStyle:c.eyeStyle, pattern:c.pattern});
+        hue:c.hue, archetype:c.archetype, bodyShape:c.bodyShape, featureType:c.featureType, eyeStyle:c.eyeStyle, pattern:c.pattern});
     });
     el.querySelectorAll('.evo-choice-card').forEach(card=>{
       card.onclick = ()=>{
@@ -985,6 +1021,7 @@ body{padding:0;align-items:stretch;}
         pet.speciesSeed = c.speciesSeed;
         pet.speciesName = c.speciesName;
         pet.hue = c.hue;
+        pet.archetype = c.archetype;
         pet.bodyShape = c.bodyShape;
         pet.featureType = c.featureType;
         pet.eyeStyle = c.eyeStyle;
@@ -1099,6 +1136,18 @@ body{padding:0;align-items:stretch;}
   const EVO_FEAT_OPTS = ['alas','cuernos','orejas','aletas','antenas','pinchos','espinas','cresta','cola','caparazon'];
   const EVO_EYE_OPTS = ['redondos','rasgados','ciclope','trio','dormidos','brillantes'];
   const EVO_PATTERN_OPTS = ['liso','manchas','rayas','estrellado','degradado','geometrico'];
+  const EVO_ARCHETYPE_OPTS = ['criatura','humanoide','bestia'];
+  const ARCHETYPE_WEIGHTS = { criatura:.5, humanoide:.17, bestia:.17, fantasia:.16 };
+  function pickArchetype(rand){
+    const total = ARCHETYPE_WEIGHTS.criatura+ARCHETYPE_WEIGHTS.humanoide+ARCHETYPE_WEIGHTS.bestia+ARCHETYPE_WEIGHTS.fantasia;
+    let r = rand()*total;
+    if(r < ARCHETYPE_WEIGHTS.criatura) return 'criatura';
+    r -= ARCHETYPE_WEIGHTS.criatura;
+    if(r < ARCHETYPE_WEIGHTS.humanoide) return 'humanoide';
+    r -= ARCHETYPE_WEIGHTS.humanoide;
+    if(r < ARCHETYPE_WEIGHTS.bestia) return 'bestia';
+    return 'fantasia';
+  }
   const AFFINITY_WEIGHTS = {
     atq:        { shape:[0.8,1.5,0.8,1.2,0.8,1.5,0.9,1.6], feat:[0.6,1.6,0.8,0.9,0.6,1.6,1.5,0.7,0.9,0.6] },
     def:        { shape:[1.1,0.9,0.7,1.6,0.7,1.5,1.0,0.8], feat:[0.6,0.9,1.5,1.5,0.6,1.0,1.4,0.8,0.7,1.7] },
@@ -1705,7 +1754,7 @@ body{padding:0;align-items:stretch;}
   }
   function mySnapshot(){
     return { name:pet.name, species:speciesDisplay(pet), stage:pet.stage, path:pet.path, power:powerOf(pet),
-      temperament:pet.temperament, hue:pet.hue, bodyShape:pet.bodyShape, featureType:pet.featureType,
+      temperament:pet.temperament, hue:pet.hue, archetype:pet.archetype, bodyShape:pet.bodyShape, featureType:pet.featureType,
       eyeStyle:pet.eyeStyle, pattern:pet.pattern, bgSeed:pet.bgSeed };
   }
   function resolveMoves(moveA, moveB, powA, powB, pathA, pathB){
@@ -1756,20 +1805,23 @@ body{padding:0;align-items:stretch;}
     </div>`;
     document.getElementById('modalRoot').appendChild(el);
     refreshScrollLock();
-    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); stopBattleIdle(); stopMiniPreviews(); el.remove(); refreshScrollLock(); };
-    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); stopBattleIdle(); stopMiniPreviews(); el.remove(); refreshScrollLock(); } });
+    document.getElementById('closeBattle').onclick=()=>{ stopBattlePoll(); stopBattleIdle(); stopMiniPreviews(); stopDungeonScene(); currentSetTab=null; el.remove(); refreshScrollLock(); };
+    el.addEventListener('click',(e)=>{ if(e.target===el){ stopBattlePoll(); stopBattleIdle(); stopMiniPreviews(); stopDungeonScene(); currentSetTab=null; el.remove(); refreshScrollLock(); } });
     function setTab(t){
       stopBattlePoll();
       stopBattleIdle();
       stopMiniPreviews();
+      stopDungeonScene();
       document.getElementById('tabLocal').classList.toggle('active', t==='local');
       document.getElementById('tabOnline').classList.toggle('active', t==='online');
       document.getElementById('tabDungeon').classList.toggle('active', t==='dungeon');
+      setArenaFullscreen(t==='dungeon');
       if(t==='local') renderLocalSetup(); else if(t==='online') renderOnlineHome(); else renderDungeonHome();
     }
     document.getElementById('tabLocal').onclick=()=>setTab('local');
     document.getElementById('tabOnline').onclick=()=>setTab('online');
     document.getElementById('tabDungeon').onclick=()=>setTab('dungeon');
+    currentSetTab = setTab;
     setTab('local');
   }
 
@@ -1802,6 +1854,7 @@ body{padding:0;align-items:stretch;}
   let localState = null;
   function startLocalBattle(p1, p2){
     localState = { p1:{...p1,hp:100,move:null}, p2:{...p2,hp:100,move:null}, log:[], turnOf:1 };
+    setArenaFullscreen(true);
     renderLocalBattle();
   }
   function renderLocalBattle(){
@@ -1812,28 +1865,38 @@ body{padding:0;align-items:stretch;}
     const active = s.turnOf===1?s.p1:s.p2;
     const finished = s.p1.hp<=0 || s.p2.hp<=0;
     c.innerHTML = `
-      <div class="vs">
-        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
-        <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
-        <div class="arena-hpbar left"><div class="arena-hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div>
-        <div class="arena-hpbar right"><div class="arena-hpfill" style="width:${Math.max(0,s.p2.hp)}%"></div></div>
-        <div class="vs-badge">VS</div>
-        <div class="fighter" id="lbFighter1"><div class="battle-sprite-box"><canvas id="lbCanvas1" width="200" height="200"></canvas><div class="name-tag">${s.p1.name}</div></div><small>${s.p1.species}</small></div>
-        <div class="fighter" id="lbFighter2"><div class="battle-sprite-box"><canvas id="lbCanvas2" width="200" height="200"></canvas><div class="name-tag">${s.p2.name}</div></div><small>${s.p2.species}</small></div>
+      <canvas id="dgCanvas"></canvas>
+      <div class="dg-topbar">
+        <button class="close-x" id="dgBack">✕</button>
+        <div></div><div></div>
       </div>
-      ${finished ? `<p style="text-align:center;font-weight:800;">${s.p1.hp<=0?s.p2.name:s.p1.name} gana la batalla 🏆</p>
-        <div class="modal-actions"><button id="againLocal">Volver a jugar</button></div>`
-      : `<p class="small-note" style="text-align:center;">Turno de <b>${active.name}</b> — elige movimiento:</p>
-        <div class="movegrid">
-          <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
-          <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
-          <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
+      <div class="dg-hpwrap">
+        <div class="dg-hpside">
+          <div class="dg-hpname">${s.p1.name}</div>
+          <div class="dg-hpbar"><div class="dg-hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div>
+        </div>
+        <div class="dg-hpside right">
+          <div class="dg-hpname">${s.p2.name}</div>
+          <div class="dg-hpbar"><div class="dg-hpfill" style="width:${Math.max(0,s.p2.hp)}%"></div></div>
+        </div>
+      </div>
+      ${finished ? `<div class="dg-bottom">
+          <div class="dg-result">${s.p1.hp<=0?s.p2.name:s.p1.name} gana la batalla 🏆</div>
+          <div class="modal-actions"><button class="status-btn action-btn" id="againLocal">Volver a jugar</button></div>
+        </div>`
+      : `<div class="dg-bottom">
+          <div class="dg-log">Turno de <b>${active.name}</b> — elige movimiento:</div>
+          <div class="dg-movegrid">
+            <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
+            <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
+            <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
+          </div>
         </div>`}
-      <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
-    const cv1 = document.getElementById('lbCanvas1'), cv2 = document.getElementById('lbCanvas2');
-    if(cv1) render3DMiniPreview(cv1, {...s.p1, stage:s.p1.stage||3, sick:false, sleeping:false});
-    if(cv2) render3DMiniPreview(cv2, {...s.p2, stage:s.p2.stage||3, sick:false, sleeping:false});
+    document.getElementById('dgBack').onclick = ()=>{ currentSetTab && currentSetTab('local'); };
+    stopDungeonScene();
+    initDungeonScene();
+    setDungeonFighters({...s.p1, stage:s.p1.stage||3, sick:false, sleeping:false}, {...s.p2, stage:s.p2.stage||3, sick:false, sleeping:false});
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=async ()=>{
@@ -1844,7 +1907,10 @@ body{padding:0;align-items:stretch;}
             s.p2.move=mv;
             const r = resolveMoves(s.p1.move, s.p2.move, s.p1.power, s.p2.power, s.p1.path, s.p2.path);
             sfx('hit');
-            await playBattleClash('lbFighter1','lbFighter2', Math.max(0,Math.round(r.dmgToA-r.healA)), Math.max(0,Math.round(r.dmgToB-r.healB)), s.p1.move, s.p2.move);
+            playDungeonAttack('me', s.p1.move==='Ataque'||s.p1.move==='Especial');
+            await sleep(280);
+            playDungeonAttack('mon', s.p2.move==='Ataque'||s.p2.move==='Especial');
+            await sleep(400);
             s.p1.hp = Math.min(100, Math.max(0, s.p1.hp - r.dmgToA + r.healA));
             s.p2.hp = Math.min(100, Math.max(0, s.p2.hp - r.dmgToB + r.healB));
             s.log.push(s.p1.name+' usó '+s.p1.move+' · '+s.p2.name+' usó '+s.p2.move+' — '+r.text);
@@ -1855,7 +1921,7 @@ body{padding:0;align-items:stretch;}
         };
       });
     } else {
-      document.getElementById('againLocal').onclick=()=>{ sfx('tap'); renderLocalSetup(); };
+      document.getElementById('againLocal').onclick=()=>{ sfx('tap'); stopDungeonScene(); setArenaFullscreen(false); renderLocalSetup(); };
     }
   }
 
@@ -1929,6 +1995,7 @@ body{padding:0;align-items:stretch;}
   }
 
   let dungeonState = null;
+  let currentSetTab = null; // para poder volver a la vista de pestañas desde dentro de la mazmorra a pantalla completa
   function disposeThreeRenderer(renderer){
     if(!renderer) return;
     try{
@@ -1946,6 +2013,134 @@ body{padding:0;align-items:stretch;}
     });
     miniPreviewInstances = [];
   }
+
+  // ---------- mi escena de la mazmorra: a pantalla completa, con los dos luchadores dentro del mismo mundo 3D ----------
+  let dungeonScene3D = null;
+  function setArenaFullscreen(on){
+    const backdrop = document.getElementById('battleModal');
+    if(!backdrop) return;
+    backdrop.classList.toggle('dg-full', on);
+    const modal = backdrop.querySelector('.modal');
+    if(modal) modal.classList.toggle('dg-full', on);
+    const tabrow = backdrop.querySelector('.tabrow');
+    if(tabrow) tabrow.style.display = on ? 'none' : 'flex';
+    const h3 = backdrop.querySelector('h3');
+    if(h3) h3.style.display = on ? 'none' : 'block';
+  }
+  function stopDungeonScene(){
+    if(dungeonScene3D){
+      if(dungeonScene3D.raf) cancelAnimationFrame(dungeonScene3D.raf);
+      if(dungeonScene3D.onResize) window.removeEventListener('resize', dungeonScene3D.onResize);
+      disposeThreeRenderer(dungeonScene3D.renderer);
+      dungeonScene3D = null;
+    }
+  }
+  function buildDungeonEnvironment(scene){
+    // suelo de piedra, un par de columnas con antorchas y un cielo de mazmorra oscuro — mismo estilo en bloques que el resto
+    scene.background = new THREE.Color(0x140d10);
+    scene.fog = new THREE.Fog(0x140d10, 7, 15);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(9,28), new THREE.MeshStandardMaterial({color:0x3a2a24, roughness:.95, flatShading:true}));
+    ground.rotation.x = -Math.PI/2; ground.position.y = -1.2;
+    scene.add(ground);
+    const pillarMat = new THREE.MeshStandardMaterial({color:0x2a1f1c, roughness:.9, flatShading:true});
+    [-3.4,3.4].forEach(x=>{
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(.6,4,.6), pillarMat);
+      pillar.position.set(x,.8,-1.5);
+      scene.add(pillar);
+      const torch = new THREE.PointLight(0xffaa55, 1.1, 6);
+      torch.position.set(x,1.6,-1.1);
+      scene.add(torch);
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(.12,6,6), new THREE.MeshBasicMaterial({color:0xffcc66}));
+      flame.position.copy(torch.position);
+      scene.add(flame);
+    });
+    scene.add(new THREE.HemisphereLight(0xaa8866, 0x150a10, .6));
+  }
+  function initDungeonScene(){
+    const canvasEl = document.getElementById('dgCanvas');
+    if(!canvasEl) return;
+    const renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    const scene = new THREE.Scene();
+    buildDungeonEnvironment(scene);
+    const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, .1, 100);
+    camera.position.set(0,1.3,11.5);
+    camera.lookAt(0,.1,0);
+    const dir = new THREE.DirectionalLight(0xffffff,.7); dir.position.set(2,4,3); scene.add(dir);
+    const meGroup = new THREE.Group(); meGroup.position.set(-1.35,0,0);
+    const monGroup = new THREE.Group(); monGroup.position.set(1.35,0,0); monGroup.rotation.y = Math.PI;
+    scene.add(meGroup); scene.add(monGroup);
+    dungeonScene3D = { renderer, scene, camera, meGroup, monGroup, meModel:null, monModel:null, bobT:0, raf:null, attack:null };
+    function onResize(){
+      if(!dungeonScene3D) return;
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', onResize);
+    dungeonScene3D.onResize = onResize;
+    function loop(){
+      if(!dungeonScene3D) return;
+      dungeonScene3D.bobT += .04;
+      const bob = Math.sin(dungeonScene3D.bobT)*.05;
+      if(dungeonScene3D.meModel) dungeonScene3D.meModel.position.y = bob;
+      if(dungeonScene3D.monModel) dungeonScene3D.monModel.position.y = Math.sin(dungeonScene3D.bobT+1)*.05;
+      applyDungeonAttack();
+      renderer.render(scene, camera);
+      dungeonScene3D.raf = requestAnimationFrame(loop);
+    }
+    loop();
+  }
+  function setDungeonFighters(meTraits, monTraits){
+    if(!dungeonScene3D) return;
+    if(dungeonScene3D.meModel){ dungeonScene3D.meGroup.remove(dungeonScene3D.meModel); }
+    if(dungeonScene3D.monModel){ dungeonScene3D.monGroup.remove(dungeonScene3D.monModel); }
+    const FIGHTER_SCALE = .48; // en cara a cara reduzco el tamaño real, si no ocupan casi toda la pantalla y se pisan al atacar
+    const meModel = meTraits ? build3DCreature(meTraits) : build3DEgg();
+    const meScale = (meModel.userData.baseScale||1) * FIGHTER_SCALE;
+    meModel.scale.setScalar(meScale);
+    meModel.rotation.y = Math.PI/2 - .3;
+    dungeonScene3D.meGroup.add(meModel);
+    dungeonScene3D.meModel = meModel;
+    const monModel = build3DCreature(monTraits);
+    const monScale = (monModel.userData.baseScale||1) * FIGHTER_SCALE;
+    monModel.scale.setScalar(monScale);
+    monModel.rotation.y = Math.PI/2 - .3;
+    dungeonScene3D.monGroup.add(monModel);
+    dungeonScene3D.monModel = monModel;
+  }
+  function playDungeonAttack(side, hit){
+    // ataca de verdad: se lanza hacia el rival, choque con destello, y retrocede a su sitio — quien recibe se sacude
+    if(!dungeonScene3D) return;
+    dungeonScene3D.attack = { side, start:performance.now(), hit };
+  }
+  function applyDungeonAttack(){
+    if(!dungeonScene3D || !dungeonScene3D.attack) return;
+    const { side, start, hit } = dungeonScene3D.attack;
+    const el = performance.now() - start;
+    const dur = 550;
+    const atkGroup = side==='me' ? dungeonScene3D.meGroup : dungeonScene3D.monGroup;
+    const defModel = side==='me' ? dungeonScene3D.monModel : dungeonScene3D.meModel;
+    if(el > dur){
+      atkGroup.position.x = side==='me' ? -1.35 : 1.35;
+      atkGroup.rotation.z = 0;
+      if(defModel) defModel.rotation.z = 0;
+      dungeonScene3D.attack = null;
+      return;
+    }
+    const t = el/dur, lunge = Math.sin(t*Math.PI); // va y vuelve en una curva suave
+    const baseX = side==='me' ? -1.35 : 1.35;
+    const dirSign = side==='me' ? 1 : -1;
+    atkGroup.position.x = baseX + dirSign*lunge*.32; // se acerca lo justo para el choque, sin llegar a pisar al rival
+    atkGroup.rotation.z = dirSign*lunge*-.12;
+    if(defModel && t>.42 && t<.75){
+      defModel.rotation.z = Math.sin((t-.42)*22)*(hit?.09:.03);
+    } else if(defModel){
+      defModel.rotation.z = 0;
+    }
+  }
+
   function render3DMiniPreview(canvasEl, traitsOrNull){
     if(typeof THREE==='undefined' || !canvasEl) return;
     const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true, alpha:true });
@@ -1994,42 +2189,41 @@ body{padding:0;align-items:stretch;}
     const rew = dungeonRewards(monster);
     const defeated = (pet.dungeonDefeated||[]).filter(f=>f!==pet.dungeonFloor);
     c.innerHTML = `
-      <div class="modal-actions"><button class="status-btn action-btn" id="dgViewStats">📊 Ver mis stats</button></div>
-      <p class="small-note" style="text-align:center;">Gana combates para subir de piso. Cuanto más nivel tengas, menos te dará cada combate.</p>
-      <div class="vs">
-        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
-        <div class="vs-badge">VS</div>
-        <div class="fighter"><div class="battle-sprite-box"><canvas id="dungeonPreviewMe" width="200" height="200"></canvas><div class="name-tag">${pet.name}</div></div><small>Nv.${pet.level}</small></div>
-        <div class="fighter"><div class="battle-sprite-box"><canvas id="dungeonPreviewMon" width="200" height="200"></canvas><div class="name-tag">${monster.name}</div></div><small>Piso ${monster.floor}</small></div>
+      <canvas id="dgCanvas"></canvas>
+      <div class="dg-topbar">
+        <button class="close-x" id="dgBack">✕</button>
+        <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:var(--luz);">MAZMORRA — PISO ${monster.floor}</div>
+        <button class="status-btn" id="dgViewStats" style="padding:6px 10px;font-size:10px;">📊 Stats</button>
       </div>
-      <div class="reward-preview">
-        <span class="type-badge">${MONSTER_TYPE_LABEL[monster.type]}</span>
-        <div class="reward-line">🏆 Recompensa por ganar: <b>+${rew.xp} XP</b> · <b>+${rew.statPts} ${STAT_LABEL[monster.type]||'de todo'}</b></div>
+      <div class="dg-home-panel">
+        <div style="text-align:center;margin-bottom:8px;">
+          <span class="type-badge">${MONSTER_TYPE_LABEL[monster.type]}</span>
+          <div class="reward-line">🏆 Recompensa por ganar: <b>+${rew.xp} XP</b> · <b>+${rew.statPts} ${STAT_LABEL[monster.type]||'de todo'}</b></div>
+        </div>
+        <div class="modal-actions"><button class="status-btn action-btn" id="startDungeon">⚔️ Enfrentarse a ${monster.name}</button></div>
+        ${defeated.length ? `<h3 style="font-size:11px;margin-top:14px;">🗡️ ELEGIR ENEMIGO YA DERROTADO</h3>
+          <div class="enemy-pick-list">
+            ${defeated.map(f=>{
+              const m = generateMonster(f);
+              const r = dungeonRewards(m);
+              return `<div class="enemy-pick" data-floor="${f}">
+                <span class="enemy-pick-icon">${m.icon||'👾'}</span>
+                <div class="enemy-pick-info">
+                  <b>${m.name}</b><small>Piso ${f} · ${MONSTER_TYPE_LABEL[m.type]}</small>
+                  <small>+${r.xp} XP · +${r.statPts} ${STAT_LABEL[m.type]||'de todo'}</small>
+                </div>
+                <button class="mini-fight-btn">Elegir</button>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
       </div>
-      <div class="modal-actions"><button class="status-btn action-btn" id="startDungeon">⚔️ Enfrentarse</button></div>
-      ${defeated.length ? `<h3 style="font-size:11px;margin-top:16px;">🗡️ ELEGIR ENEMIGO YA DERROTADO</h3>
-        <p class="small-note">Puedes repetir combate contra cualquiera de estos, aunque den menos recompensa que el piso actual.</p>
-        <div class="enemy-pick-list">
-          ${defeated.map(f=>{
-            const m = generateMonster(f);
-            const r = dungeonRewards(m);
-            return `<div class="enemy-pick" data-floor="${f}">
-              <span class="enemy-pick-icon">${m.icon||'👾'}</span>
-              <div class="enemy-pick-info">
-                <b>${m.name}</b><small>Piso ${f} · ${MONSTER_TYPE_LABEL[m.type]}</small>
-                <small>+${r.xp} XP · +${r.statPts} ${STAT_LABEL[m.type]||'de todo'}</small>
-              </div>
-              <button class="mini-fight-btn">Elegir</button>
-            </div>`;
-          }).join('')}
-        </div>` : ''}
     `;
+    document.getElementById('dgBack').onclick = ()=>{ currentSetTab && currentSetTab('local'); };
     document.getElementById('startDungeon').onclick = ()=>{ sfx('tap'); startDungeonBattle(monster); };
     document.getElementById('dgViewStats').onclick = ()=>{ sfx('tap'); openInfoModal(); };
-    const meCv = document.getElementById('dungeonPreviewMe');
-    if(pet.stage>0 && meCv){ render3DMiniPreview(meCv, pet.stage===0 ? null : snapshotVisual(pet)); }
-    const monCv = document.getElementById('dungeonPreviewMon');
-    if(monCv){ render3DMiniPreview(monCv, monster.sprite); }
+    stopDungeonScene(); // cada vez que reconstruyo el HTML se crea un <canvas> nuevo, así que el renderizador tiene que ser nuevo también
+    initDungeonScene();
+    setDungeonFighters(pet.stage===0 ? null : snapshotVisual(pet), monster.sprite);
     c.querySelectorAll('[data-floor]').forEach(chip=>{
       chip.onclick=()=>{ sfx('tap'); startDungeonBattle(generateMonster(parseInt(chip.getAttribute('data-floor'),10))); };
     });
@@ -2045,41 +2239,49 @@ body{padding:0;align-items:stretch;}
   }
 
   function renderDungeonBattle(){
-    stopMiniPreviews();
     const c = document.getElementById('battleContent');
     const s = dungeonState;
     if(!s) return;
     const finished = s.p1.hp<=0 || s.m.hp<=0;
     c.innerHTML = `
-      <div class="modal-actions"><button class="status-btn action-btn" id="dgViewStats2">📊 Ver mis stats</button></div>
-      <div class="vs">
-        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
-        <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
-        <div class="arena-hpbar left"><div class="arena-hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div>
-        <div class="arena-hpbar right"><div class="arena-hpfill" style="width:${Math.max(0,s.m.hp)}%"></div></div>
-        <div class="vs-badge">VS</div>
-        <div class="fighter" id="dgFighterMe"><div class="battle-sprite-box"><canvas id="dungeonBattleMe" width="200" height="200"></canvas><div class="name-tag">${s.p1.name}</div></div><small>${s.p1.species}</small></div>
-        <div class="fighter" id="dgFighterMon"><div class="battle-sprite-box"><canvas id="dungeonBattleMon" width="200" height="200"></canvas><div class="name-tag">${s.m.name}</div></div><span class="type-badge">${MONSTER_TYPE_LABEL[s.m.type]}</span></div>
+      <canvas id="dgCanvas"></canvas>
+      <div class="dg-topbar">
+        <button class="close-x" id="dgBack">✕</button>
+        <div></div>
+        <button class="status-btn" id="dgViewStats2" style="padding:6px 10px;font-size:10px;">📊 Stats</button>
       </div>
-      ${finished ? (s.m.hp<=0
-          ? `<p style="text-align:center;font-weight:800;">¡Victoria! 🏆</p>
-             <div class="modal-actions"><button class="status-btn action-btn" id="nextFloor">${s.m.floor===pet.dungeonFloor?'Siguiente piso':'Volver a la mazmorra'}</button></div>
-             <div class="modal-actions"><button class="status-btn action-btn" id="rematchDg">🔁 Volver a pelear con ${s.m.name}</button></div>`
-          : `<p style="text-align:center;font-weight:800;">${s.m.name} te ha derrotado 💥</p>
-             <div class="modal-actions"><button class="status-btn action-btn" id="retryFloor">Reintentar</button></div>`)
-      : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
-        <div class="movegrid">
-          <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
-          <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
-          <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
+      <div class="dg-hpwrap">
+        <div class="dg-hpside">
+          <div class="dg-hpname">${s.p1.name}</div>
+          <div class="dg-hpbar"><div class="dg-hpfill" style="width:${Math.max(0,s.p1.hp)}%"></div></div>
+        </div>
+        <div class="dg-hpside right">
+          <div class="dg-hpname">${s.m.name} <span class="type-badge">${MONSTER_TYPE_LABEL[s.m.type]}</span></div>
+          <div class="dg-hpbar"><div class="dg-hpfill" style="width:${Math.max(0,s.m.hp)}%"></div></div>
+        </div>
+      </div>
+      ${finished ? `<div class="dg-bottom">
+          ${s.m.hp<=0
+            ? `<div class="dg-result">¡Victoria! 🏆</div>
+               <div class="modal-actions"><button class="status-btn action-btn" id="nextFloor">${s.m.floor===pet.dungeonFloor?'Siguiente piso':'Volver a la mazmorra'}</button></div>
+               <div class="modal-actions"><button class="status-btn action-btn" id="rematchDg">🔁 Volver a pelear con ${s.m.name}</button></div>`
+            : `<div class="dg-result">${s.m.name} te ha derrotado 💥</div>
+               <div class="modal-actions"><button class="status-btn action-btn" id="retryFloor">Reintentar</button></div>`}
+        </div>`
+      : `<div class="dg-bottom">
+          <div class="dg-log">${(s.log[s.log.length-1])||'El combate comienza...'}</div>
+          <div class="dg-movegrid">
+            <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
+            <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
+            <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
+          </div>
         </div>`}
-      <div class="battlelog">${s.log.slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
-    const meCv = document.getElementById('dungeonBattleMe');
+    document.getElementById('dgBack').onclick = ()=>{ currentSetTab && currentSetTab('local'); };
     document.getElementById('dgViewStats2').onclick = ()=>{ sfx('tap'); openInfoModal(); };
-    if(meCv){ render3DMiniPreview(meCv, pet.stage===0 ? null : snapshotVisual(pet)); }
-    const monCv = document.getElementById('dungeonBattleMon');
-    if(monCv){ render3DMiniPreview(monCv, s.m.sprite); }
+    stopDungeonScene();
+    initDungeonScene();
+    setDungeonFighters(pet.stage===0 ? null : snapshotVisual(pet), s.m.sprite);
     if(!finished){
       c.querySelectorAll('[data-mv]').forEach(btn=>{
         btn.onclick=async ()=>{
@@ -2089,7 +2291,10 @@ body{padding:0;align-items:stretch;}
           const mmv = MOVES3[Math.floor(Math.random()*3)];
           const r = resolveMoves(mv, mmv, s.p1.power, s.m.power, s.p1.path, null);
           sfx('hit');
-          await playBattleClash('dgFighterMe','dgFighterMon', Math.max(0,Math.round(r.dmgToA-r.healA)), Math.max(0,Math.round(r.dmgToB-r.healB)), mv, mmv);
+          playDungeonAttack('me', mv==='Ataque'||mv==='Especial');
+          await sleep(280);
+          playDungeonAttack('mon', mmv==='Ataque'||mmv==='Especial');
+          await sleep(400);
           s.p1.hp = Math.min(100, Math.max(0, s.p1.hp - r.dmgToA + r.healA));
           s.m.hp = Math.min(100, Math.max(0, s.m.hp - r.dmgToB + r.healB));
           s.log.push(s.p1.name+' usó '+mv+' · '+s.m.name+' usó '+mmv+' — '+r.text);
@@ -2164,6 +2369,7 @@ body{padding:0;align-items:stretch;}
   }
 
   async function renderOnlineHome(){
+    setArenaFullscreen(false);
     const c = document.getElementById('battleContent');
     c.innerHTML = `<p class="small-note">Combate online — cualquiera que abra este mismo VPET puede retarte, esté donde esté. Tu nombre y tu especie serán visibles para otros jugadores mientras el reto esté abierto.</p>
       <div class="modal-actions">
@@ -2180,6 +2386,7 @@ body{padding:0;align-items:stretch;}
   }
 
   async function createChallenge(){
+    setArenaFullscreen(false);
     let list = await getOpenList();
     const now = Date.now();
     list = list.filter(c => now - c.ts < 10*60*1000 && c.name);
@@ -2279,41 +2486,48 @@ body{padding:0;align-items:stretch;}
   }
 
   function renderOnlineBattleUI(doc, mySlot, id){
-    stopMiniPreviews();
     const c = document.getElementById('battleContent');
     const me = doc[mySlot];
     const opp = doc[mySlot==='p1'?'p2':'p1'];
     const myMoveSet = !!me.move;
+    setArenaFullscreen(true);
     c.innerHTML = `
-      <div class="vs">
-        <div class="arena-pillar l"></div><div class="arena-pillar r"></div>
-        <div class="arena-portrait left"></div><div class="arena-portrait right"></div>
-        <div class="arena-hpbar left"><div class="arena-hpfill" style="width:${Math.max(0,doc.p1.hp)}%"></div></div>
-        <div class="arena-hpbar right"><div class="arena-hpfill" style="width:${Math.max(0,doc.p2.hp)}%"></div></div>
-        <div class="vs-badge">VS</div>
-        <div class="fighter" id="obFighter1"><div class="battle-sprite-box"><canvas id="obCanvas1" width="200" height="200"></canvas><div class="name-tag">${doc.p1.name}</div></div><small>${doc.p1.species}</small></div>
-        <div class="fighter" id="obFighter2"><div class="battle-sprite-box"><canvas id="obCanvas2" width="200" height="200"></canvas><div class="name-tag">${doc.p2.name}</div></div><small>${doc.p2.species}</small></div>
+      <canvas id="dgCanvas"></canvas>
+      <div class="dg-topbar">
+        <button class="close-x" id="dgBack">✕</button><div></div><div></div>
       </div>
-      ${doc.finished ? `<p style="text-align:center;font-weight:800;">${doc.winner} gana la batalla 🏆</p>
-        <div class="modal-actions"><button id="backOnline">Volver a la arena</button></div>
-        <div class="modal-actions"><button class="status-btn action-btn" id="rematchOnline">📣 Publicar otro reto</button></div>`
-      : myMoveSet ? `<p class="small-note" style="text-align:center;">Esperando el movimiento de ${opp.name}...</p>`
-      : `<p class="small-note" style="text-align:center;">Elige tu movimiento:</p>
-        <div class="movegrid">
-          <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
-          <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
-          <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
+      <div class="dg-hpwrap">
+        <div class="dg-hpside">
+          <div class="dg-hpname">${doc.p1.name}</div>
+          <div class="dg-hpbar"><div class="dg-hpfill" style="width:${Math.max(0,doc.p1.hp)}%"></div></div>
+        </div>
+        <div class="dg-hpside right">
+          <div class="dg-hpname">${doc.p2.name}</div>
+          <div class="dg-hpbar"><div class="dg-hpfill" style="width:${Math.max(0,doc.p2.hp)}%"></div></div>
+        </div>
+      </div>
+      ${doc.finished ? `<div class="dg-bottom">
+          <div class="dg-result">${doc.winner} gana la batalla 🏆</div>
+          <div class="modal-actions"><button class="status-btn action-btn" id="backOnline">Volver a la arena</button></div>
+          <div class="modal-actions"><button class="status-btn action-btn" id="rematchOnline">📣 Publicar otro reto</button></div>
+        </div>`
+      : `<div class="dg-bottom">
+          <div class="dg-log">${myMoveSet ? 'Esperando el movimiento de '+opp.name+'...' : 'Elige tu movimiento:'}</div>
+          ${myMoveSet ? '' : `<div class="dg-movegrid">
+            <button class="action-btn" data-mv="Ataque">⚔️<br>Ataque</button>
+            <button class="action-btn" data-mv="Especial">✨<br>Especial</button>
+            <button class="action-btn" data-mv="Defensa">🛡️<br>Defensa</button>
+          </div>`}
         </div>`}
-      <div class="battlelog">${(doc.log||[]).slice().reverse().map(l=>'<div>'+l+'</div>').join('') || 'El combate comienza...'}</div>
     `;
-    const ob1 = document.getElementById('obCanvas1'), ob2 = document.getElementById('obCanvas2');
-    if(ob1) render3DMiniPreview(ob1, {...doc.p1, stage:doc.p1.stage||3, sick:false, sleeping:false});
-    if(ob2) render3DMiniPreview(ob2, {...doc.p2, stage:doc.p2.stage||3, sick:false, sleeping:false});
+    document.getElementById('dgBack').onclick = ()=>{ stopBattlePoll(); stopDungeonScene(); currentSetTab && currentSetTab('online'); };
+    stopDungeonScene();
+    initDungeonScene();
+    setDungeonFighters({...doc.p1, stage:doc.p1.stage||3, sick:false, sleeping:false}, {...doc.p2, stage:doc.p2.stage||3, sick:false, sleeping:false});
     if(doc.resolvedRound>0 && lastOnlineShakeRound!==doc.resolvedRound){
       lastOnlineShakeRound = doc.resolvedRound;
-      const dmg1 = Math.max(0, Math.round(lastOnlineHp.p1 - doc.p1.hp));
-      const dmg2 = Math.max(0, Math.round(lastOnlineHp.p2 - doc.p2.hp));
-      playBattleClash('obFighter1','obFighter2', dmg1, dmg2, doc.lastMove1, doc.lastMove2);
+      playDungeonAttack('me', doc.lastMove1==='Ataque'||doc.lastMove1==='Especial');
+      setTimeout(()=>playDungeonAttack('mon', doc.lastMove2==='Ataque'||doc.lastMove2==='Especial'), 280);
     }
     lastOnlineHp = {p1:doc.p1.hp, p2:doc.p2.hp};
     if(!doc.finished && !myMoveSet){
@@ -2337,7 +2551,7 @@ body{padding:0;align-items:stretch;}
         sfx(doc.winner===me.name ? 'win' : 'lose');
       }
       const backBtn = document.getElementById('backOnline');
-      if(backBtn) backBtn.onclick = ()=>{ sfx('tap'); renderOnlineHome(); };
+      if(backBtn) backBtn.onclick = ()=>{ sfx('tap'); stopDungeonScene(); setArenaFullscreen(false); renderOnlineHome(); };
       const rematchBtn = document.getElementById('rematchOnline');
       if(rematchBtn) rematchBtn.onclick = ()=>{ sfx('tap'); createChallenge(); };
     }
@@ -2895,7 +3109,7 @@ body{padding:0;align-items:stretch;}
       else if(style==='diamond') widthFactor = Math.max(0, 1-Math.abs(yNorm));
       else widthFactor = Math.sqrt(Math.max(0, 1-yNorm*yNorm));
       if(widthFactor<=0.06) continue;
-      const boxW = widthFactor*1.75*sx, boxD = widthFactor*1.75*sz, boxH = (2/rows)*sy*1.08;
+      const boxW = widthFactor*1.5*sx, boxD = widthFactor*1.5*sz, boxH = (2/rows)*sy*1.08;
       const box = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), mat);
       box.position.y = yNorm*sy;
       group.add(box);
@@ -2912,8 +3126,8 @@ body{padding:0;align-items:stretch;}
     function cyl(r1,r2,h){ return new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,4), mat); }
     if(featureType==='alas'){
       [-1,1].forEach(side=>{
-        const wing = box(.08, ry*1.1, rx*1.3);
-        wing.position.set(side*rx*1.05, ry*.15, 0);
+        const wing = box(.08, ry*1.1, rx*1.0);
+        wing.position.set(side*rx*.72, ry*.15, 0);
         wing.rotation.z = side*0.35;
         g.add(wing);
       });
@@ -2933,7 +3147,7 @@ body{padding:0;align-items:stretch;}
     } else if(featureType==='aletas'){
       [-1,1].forEach(side=>{
         const fin = box(.06, ry*.6, rx*.6);
-        fin.position.set(side*rx*.95, -ry*.1, 0);
+        fin.position.set(side*rx*.68, -ry*.1, 0);
         fin.rotation.z = side*0.5;
         g.add(fin);
       });
@@ -3008,6 +3222,77 @@ body{padding:0;align-items:stretch;}
     return g;
   }
 
+  function build3DHumanoid(pal){
+    // cabeza, torso y las cuatro extremidades por separado, de pie sobre dos piernas
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.8, flatShading:true });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.62,.6,.56), mat);
+    head.position.y = 1.05;
+    g.add(head);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(.78,.9,.46), mat);
+    torso.position.y = .32;
+    g.add(torso);
+    [-1,1].forEach(side=>{
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(.22,.85,.24), mat);
+      arm.position.set(side*.52, .28, 0);
+      arm.rotation.z = side*-.12;
+      g.add(arm);
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.26,.85,.28), mat);
+      leg.position.set(side*.24, -.68, 0);
+      g.add(leg);
+    });
+    return { group:g, headAnchor:{y:1.05, rx:.55, ry:.5, z:.3} };
+  }
+  function build3DBeast(pal){
+    // torso horizontal a cuatro patas, con cabeza al frente y cola detrás
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.8, flatShading:true });
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(.8,.72,1.5), mat);
+    torso.position.y = -.05;
+    g.add(torso);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.6,.56,.6), mat);
+    head.position.set(0, .12, .95);
+    g.add(head);
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.22,.62,.22), mat);
+      leg.position.set(sx*.32, -.66, sz*.5);
+      g.add(leg);
+    });
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(.1,.2,.9,5), mat);
+    tail.position.set(0,.05,-.95);
+    tail.rotation.x = Math.PI/2.3;
+    g.add(tail);
+    return { group:g, headAnchor:{y:.12, rx:.5, ry:.45, z:1.25} };
+  }
+  function build3DFantasy(pal){
+    // cuerpo serpenteante y alargado, con alas grandes y cola larga — porte de criatura mítica
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.75, flatShading:true });
+    for(let i=0;i<4;i++){
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(.5-i*.06,.5-i*.06,.5), mat);
+      seg.position.set(0, .1+i*.06, .5-i*.42);
+      g.add(seg);
+    }
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.56,.5,.62), mat);
+    head.position.set(0, .35, 1.05);
+    g.add(head);
+    [-1,1].forEach(side=>{
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(.08, .95, 1.15), mat);
+      wing.position.set(side*.75, .5, -.1);
+      wing.rotation.z = side*.4;
+      wing.rotation.y = side*.15;
+      g.add(wing);
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.2,.5,.2), mat);
+      leg.position.set(side*.28, -.5, -.2);
+      g.add(leg);
+    });
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(.06,.22,1.3,5), mat);
+    tail.position.set(0,.15,-1.35);
+    tail.rotation.x = Math.PI/2.2;
+    g.add(tail);
+    return { group:g, headAnchor:{y:.35, rx:.5, ry:.42, z:1.35} };
+  }
+
   function build3DCreature(traits){
     const group = new THREE.Group();
     const hue = traits.hue||0;
@@ -3017,14 +3302,34 @@ body{padding:0;align-items:stretch;}
       dark: hueToThreeColor(hue, .55, .28),
       accent: hueToThreeColor((hue+35)%360, .7, .6)
     };
-    const body = build3DBody(pal, traits.bodyShape||'redondo');
-    group.add(body);
-    const belly = new THREE.Mesh(new THREE.BoxGeometry(1.05,1.1,.55), new THREE.MeshStandardMaterial({color:pal.belly, roughness:.75, flatShading:true}));
-    belly.position.set(0,-.25,.55);
-    group.add(belly);
-    const feat = build3DFeature(pal, traits.featureType||'alas', 1, 1);
+    const archetype = traits.archetype || 'criatura';
+    let headAnchor = {y:0, rx:1, ry:1, z:.88};
+    if(archetype==='humanoide'){
+      const r = build3DHumanoid(pal); group.add(r.group); headAnchor = r.headAnchor;
+    } else if(archetype==='bestia'){
+      const r = build3DBeast(pal); group.add(r.group); headAnchor = r.headAnchor;
+    } else if(archetype==='fantasia'){
+      const r = build3DFantasy(pal); group.add(r.group); headAnchor = r.headAnchor;
+    } else {
+      const body = build3DBody(pal, traits.bodyShape||'redondo');
+      group.add(body);
+      const belly = new THREE.Mesh(new THREE.BoxGeometry(1.05,1.1,.55), new THREE.MeshStandardMaterial({color:pal.belly, roughness:.75, flatShading:true}));
+      belly.position.set(0,-.25,.55);
+      group.add(belly);
+      // contorno oscuro tipo "cartoon" para que se note el borde, como el pixel art recortado — solo en la criatura
+      // clásica; a las otras formas (con brazos, patas, alas...) no les hace falta, ya se distinguen bien solas
+      const outlineMat = new THREE.MeshBasicMaterial({ color:0x0a1712, side:THREE.BackSide });
+      const bodyOutline = build3DBody({body:0x0a1712}, traits.bodyShape||'redondo');
+      bodyOutline.traverse(o=>{ if(o.isMesh){ o.material = outlineMat; o.scale.multiplyScalar(1.08); } });
+      group.add(bodyOutline);
+    }
+    const feat = build3DFeature(pal, traits.featureType||'alas', headAnchor.rx, headAnchor.ry);
+    feat.position.y += headAnchor.y;
+    feat.position.z += headAnchor.z - .88;
     group.add(feat);
-    const eyes = build3DEyes(traits.eyeStyle||'redondos', 1, 1, !!traits.sleeping);
+    const eyes = build3DEyes(traits.eyeStyle||'redondos', headAnchor.rx, headAnchor.ry, !!traits.sleeping);
+    eyes.position.y += headAnchor.y;
+    eyes.position.z += headAnchor.z - .88;
     group.add(eyes);
     if(traits.pattern==='manchas'){
       for(let i=0;i<4;i++){
@@ -3039,11 +3344,10 @@ body{padding:0;align-items:stretch;}
         group.add(stripe);
       }
     }
-    // contorno oscuro tipo "cartoon" para que se note el borde, como el pixel art recortado
-    const outlineMat = new THREE.MeshBasicMaterial({ color:0x0a1712, side:THREE.BackSide });
-    const bodyOutline = build3DBody({body:0x0a1712}, traits.bodyShape||'redondo');
-    bodyOutline.traverse(o=>{ if(o.isMesh){ o.material = outlineMat; o.scale.multiplyScalar(1.08); } });
-    group.add(bodyOutline);
+    // crece de verdad con las etapas, igual que hacía en pixel art — antes se quedaba siempre del mismo
+    // tamaño y por eso una Cría se veía igual de grande que una Suprema, ocupando de más en pantalla
+    const STAGE_SCALE = {0:.55, 1:.676, 2:.824, 3:1, 4:1.147, 5:1.294};
+    group.userData.baseScale = STAGE_SCALE[traits.stage!=null?traits.stage:3] || 1;
     return group;
   }
 
@@ -3244,7 +3548,21 @@ body{padding:0;align-items:stretch;}
       spot.position.set(p[0],p[1],p[2]);
       g.add(spot);
     });
+    g.userData.baseScale = .55;
     return g;
+  }
+
+  function computeDefaultCamDist(){
+    // calculo cuánto tengo que alejar la cámara para que quepa hasta la combinación más grande posible
+    // (Suprema con alas o cuernos extendidos), según la proporción real de la pantalla — lo medí de verdad
+    // con la caja de colisión de Three.js, no a ojo, porque en móvil vertical el ancho manda, no el alto
+    const aspect = window.innerWidth / window.innerHeight;
+    const halfV = Math.tan((42/2) * Math.PI/180);
+    const maxHalfHeight = 2.15; // el humanoide con cuernos mide hasta 3.81 de alto total — dejo margen de sobra
+    const maxHalfWidth = 1.7; // la Suprema con alas más ancha ronda 2.83 de ancho total, con margen
+    const distForHeight = maxHalfHeight / halfV;
+    const distForWidth = maxHalfWidth / (halfV*aspect);
+    return Math.max(distForHeight, distForWidth, 5.5);
   }
 
   function initMainScene3D(){
@@ -3253,7 +3571,7 @@ body{padding:0;align-items:stretch;}
     renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-    let camDist = 5.2;
+    let camDist = computeDefaultCamDist();
     camera.position.set(0, 1.1, camDist);
     camera.lookAt(0, .3, 0);
     const hemi = new THREE.HemisphereLight(0xbfe8ff, 0x201030, .9);
@@ -3283,6 +3601,7 @@ body{padding:0;align-items:stretch;}
     const STROKE_THRESHOLD = 42; // píxeles que hay que recorrer sobre ella para que cuente como caricia de verdad
     function hitsPet(x,y){
       if(!mainScene3D.model) return false;
+      if(document.getElementById('modalRoot').children.length>0) return false; // con un menú abierto no cuenta como tocar a la mascota
       const rect = canvasEl.getBoundingClientRect();
       const ndc = { x:((x-rect.left)/rect.width)*2-1, y:-((y-rect.top)/rect.height)*2+1 };
       raycaster.setFromCamera(ndc, camera);
@@ -3370,7 +3689,7 @@ body{padding:0;align-items:stretch;}
     function onUp(x,y){ if(mainScene3D) mainScene3D.dragging=false; if(x!=null) tapUp(); }
     function applyZoom(delta){
       // acerco o alejo la cámara sin dejar que atraviese a la mascota ni se vaya demasiado lejos
-      mainScene3D.camDist = Math.max(2.4, Math.min(9.5, mainScene3D.camDist + delta));
+      mainScene3D.camDist = Math.max(4, Math.min(14, mainScene3D.camDist + delta));
     }
     canvasEl.addEventListener('mousedown', e=>onDown(e.clientX,e.clientY));
     window.addEventListener('mousemove', e=>onMove(e.clientX,e.clientY));
@@ -3406,29 +3725,37 @@ body{padding:0;align-items:stretch;}
     // ---- lo que hace sola cuando no la toco: cada poco elige una conducta nueva y la mantiene un rato ----
     const IDLE_POOL_ACTIVE = ['pasear','jugar','saltar','girar','bailar','pasear','estirarse'];
     const IDLE_POOL_CALMA = ['quieta','estirarse','oler','quieta','pasear'];
-    function pickIdleBehavior(mood){
-      const pool = (mood==='triste'||mood==='cansada'||mood==='enferma') ? IDLE_POOL_CALMA
-                 : (mood==='euforica'||mood==='feliz') ? IDLE_POOL_ACTIVE
+    const ARCHETYPE_SPECIAL_MOVE = { humanoide:'saludar', bestia:'cazar', fantasia:'planear' };
+    function pickIdleBehavior(mood, archetype){
+      if(mood==='dormida') return 'dormir'; // dormida no se mueve de sitio, solo respira — antes podía tocarle pasear o jugar por error
+      const pool = (mood==='triste'||mood==='cansada'||mood==='enferma') ? IDLE_POOL_CALMA.slice()
+                 : (mood==='euforica'||mood==='feliz') ? IDLE_POOL_ACTIVE.slice()
                  : ['pasear','jugar','oler','estirarse','girar','quieta'];
+      // a las formas nuevas les doy, además, su propio gesto característico, mezclado con el resto
+      const special = ARCHETYPE_SPECIAL_MOVE[archetype];
+      if(special && mood!=='triste' && mood!=='enferma'){ pool.push(special, special); }
       return pool[Math.floor(Math.random()*pool.length)];
     }
-    function updateIdleBehavior(model, mood, now){
+    function updateIdleBehavior(model, mood, now, archetype){
       if(!mainScene3D.idle){
         mainScene3D.idle = { behavior:'quieta', startAt:now, durMs:3000, walkFrom:{x:0,z:0}, walkTo:{x:0,z:0} };
       }
       const idle = mainScene3D.idle;
       const elapsed = now - idle.startAt;
-      if(elapsed >= idle.durMs){
-        idle.behavior = pickIdleBehavior(mood);
+      const mustSleepNow = mood==='dormida' && idle.behavior!=='dormir';
+      const mustWakeNow = mood!=='dormida' && idle.behavior==='dormir';
+      if(elapsed >= idle.durMs || mustSleepNow || mustWakeNow){
+        idle.behavior = pickIdleBehavior(mood, archetype);
         idle.startAt = now;
-        idle.durMs = 3200 + Math.random()*4600; // cada conducta dura entre ~3 y ~8 segundos
+        idle.durMs = mood==='dormida' ? 999999 : 3200 + Math.random()*4600; // dormida se queda así hasta que se despierte, no vuelvo a sortear
         if(idle.behavior==='pasear'){
           idle.walkFrom = { x: model.position.x, z: model.position.z };
           const angle = Math.random()*Math.PI*2, dist = .5+Math.random()*1.2;
           idle.walkTo = { x: Math.cos(angle)*dist, z: Math.sin(angle)*dist };
         }
+        if(idle.behavior==='dormir'){ model.position.x = 0; model.position.z = 0; } // se queda quieta justo donde toca dormir
       }
-      let extraRotY=0, extraScale=1, bobBoost=1;
+      let extraRotY=0, extraScale=1, bobBoost=1, extraTiltZ=0;
       const b = idle.behavior, el = now - idle.startAt;
       if(b==='pasear'){
         const walkT = Math.min(1, el/1700);
@@ -3453,8 +3780,26 @@ body{padding:0;align-items:stretch;}
         extraScale = 1 + Math.sin(el*0.0025)*.07;
       } else if(b==='oler'){
         model.rotation.x += Math.sin(el*0.007)*.07;
+      } else if(b==='saludar'){
+        // el humanoide se inclina de lado a lado, como saludando con todo el cuerpo
+        extraTiltZ = Math.sin(el*0.007)*.22;
+        bobBoost = .6;
+      } else if(b==='cazar'){
+        // la bestia se agazapa un momento y luego da un pequeño salto hacia delante, como al acecho
+        const t = (el%1400)/1400;
+        if(t<.55){ extraScale = 1 - (t/.55)*.1; }
+        else { const jt=(t-.55)/.45; extraScale = .9 + jt*.1; bobBoost = 1+jt*2.4; }
+      } else if(b==='planear'){
+        // la fantasía inclina las alas y flota describiendo una curva suave, como planeando
+        extraTiltZ = Math.sin(el*0.0035)*.28;
+        extraRotY = Math.sin(el*0.0035)*.3;
+        bobBoost = .5;
+      } else if(b==='dormir'){
+        // completamente quieta, ni gira ni se desplaza — solo la respiración lenta que ya le pone el ánimo "dormida"
+        bobBoost = 1;
       }
       model.rotation.y = extraRotY;
+      model.rotation.z += extraTiltZ;
       return { extraScale, bobBoost };
     }
 
@@ -3529,11 +3874,11 @@ body{padding:0;align-items:stretch;}
         const {bobSpeed, bobAmp, hop} = mainScene3D.model ? applyMoodPose(mainScene3D.model, mood, mainScene3D.bobT) : {bobSpeed:.03, bobAmp:.06, hop:0};
         let bobBoost = 1, idleScale = 1;
         if(mainScene3D.model && !mainScene3D.dragging){
-          const idleOut = updateIdleBehavior(mainScene3D.model, mood, performance.now());
+          const idleOut = updateIdleBehavior(mainScene3D.model, mood, performance.now(), pet.archetype||'criatura');
           bobBoost = idleOut.bobBoost; idleScale = idleOut.extraScale;
         }
         const reaction = mainScene3D.model ? applyReaction(mainScene3D.model) : {y:0, scale:1};
-        if(mainScene3D.model) mainScene3D.model.scale.setScalar(idleScale * reaction.scale);
+        if(mainScene3D.model) mainScene3D.model.scale.setScalar((mainScene3D.model.userData.baseScale||1) * idleScale * reaction.scale);
         mainScene3D.bobT += bobSpeed;
         mainScene3D.group.rotation.y = mainScene3D.rotY; // ya no giro solo — únicamente cuando arrastras con el dedo
         mainScene3D.group.rotation.x = mainScene3D.rotX;
@@ -3581,7 +3926,7 @@ body{padding:0;align-items:stretch;}
       catch(e){ threeFailedOnce = true; console.error('No pude iniciar el visor 3D, uso el pixel art de siempre:', e); }
     }
     if(!mainScene3D){ render2DFallback(); return; }
-    const sig = [pet.stage, pet.hue, pet.bodyShape, pet.featureType, pet.eyeStyle, pet.pattern, pet.sick, pet.sleeping, pet.bgSeed].join('|');
+    const sig = [pet.stage, pet.hue, pet.archetype, pet.bodyShape, pet.featureType, pet.eyeStyle, pet.pattern, pet.sick, pet.sleeping, pet.bgSeed].join('|');
     if(sig !== mainSceneSignature){
       mainSceneSignature = sig;
       while(mainScene3D.group.children.length){ mainScene3D.group.remove(mainScene3D.group.children[0]); }
