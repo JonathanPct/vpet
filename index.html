@@ -4087,7 +4087,7 @@ body{padding:0;align-items:stretch;}
       boot.position.set(side*.24, -1.06, .03);
       g.add(boot);
     });
-    return { group:g, headAnchor:{y:1.05, rx:.55, ry:.5, z:.3} };
+    return { group:g, headAnchor:{y:1.05, rx:.55, ry:.5, z:0} };
   }
   function build3DBeast(pal){
     // torso horizontal a cuatro patas, con cabeza al frente y cola detrás — le añado melena en el lomo,
@@ -4139,7 +4139,7 @@ body{padding:0;align-items:stretch;}
     const tailTuft = new THREE.Mesh(new THREE.SphereGeometry(.16,7,6), furMat);
     tailTuft.position.set(0,.42,-1.35);
     g.add(tailTuft);
-    return { group:g, headAnchor:{y:.12, rx:.5, ry:.45, z:1.25} };
+    return { group:g, headAnchor:{y:.12, rx:.5, ry:.45, z:.95} };
   }
   function build3DFantasy(pal){
     // cuerpo serpenteante y alargado, con alas grandes y cola larga — le añado púas en el lomo y en la
@@ -4193,7 +4193,7 @@ body{padding:0;align-items:stretch;}
       spike.position.set(0, .3+i*.13, -.85-i*.28);
       g.add(spike);
     }
-    return { group:g, headAnchor:{y:.35, rx:.5, ry:.42, z:1.35} };
+    return { group:g, headAnchor:{y:.35, rx:.5, ry:.42, z:1.05} };
   }
   function build3DBug(pal){
     // cuerpo de insecto en tres partes (cabeza, tórax, abdomen), seis patas articuladas y antenas —
@@ -4239,7 +4239,7 @@ body{padding:0;align-items:stretch;}
       ant.rotation.z = s*.25;
       g.add(ant);
     });
-    return { group:g, headAnchor:{y:.06, rx:.32, ry:.3, z:1.2} };
+    return { group:g, headAnchor:{y:.06, rx:.32, ry:.3, z:.88} };
   }
 
   function build3DCreature(traits){
