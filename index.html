@@ -3589,6 +3589,36 @@ body{padding:0;align-items:stretch;}
     nextRound();
   }
 
+  function openResetConfirmModal(){
+    // pido confirmación explícita antes de borrar nada — esto no se puede deshacer, así que dejo muy claro
+    // lo que se pierde antes de que puedan darle sin querer
+    const el = document.createElement('div');
+    el.className='modal-backdrop'; el.id='resetConfirmModal';
+    el.innerHTML = `<div class="modal">
+      <button class="close-x" id="closeResetConfirm">✕</button>
+      <h3>⚠️ REINICIAR PARTIDA</h3>
+      <p class="small-note">Vas a borrar a <b>${pet.name}</b> (Nv.${pet.level}) para siempre. No podrás recuperar a tu mascota actual, su nivel ni su progreso — empezarás desde un huevo nuevo.</p>
+      <p class="small-note"><b>Esta acción no se puede deshacer.</b></p>
+      <div class="modal-actions" style="flex-direction:column;gap:10px;">
+        <button class="status-btn" id="cancelReset">Cancelar</button>
+        <button class="status-btn" id="confirmReset" style="background:#8a2020;">Sí, borrar y empezar de nuevo</button>
+      </div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    refreshScrollLock();
+    const close = ()=>{ el.remove(); refreshScrollLock(); };
+    document.getElementById('closeResetConfirm').onclick = close;
+    document.getElementById('cancelReset').onclick = close;
+    el.addEventListener('click',(e)=>{ if(e.target===el) close(); });
+    document.getElementById('confirmReset').onclick = async ()=>{
+      pet = freshPet();
+      try{ await CloudAdapter.set(STORAGE_KEY, JSON.stringify(pet), false); }catch(e){ /* si falla el guardado, igualmente sigo con el huevo nuevo en memoria */ }
+      close();
+      showToast('Empiezas de nuevo con un huevo fresco 🥚');
+      render();
+    };
+  }
+
   function openMoreMenu(){
     sfx('tap');
     const el = document.createElement('div');
@@ -3603,6 +3633,7 @@ body{padding:0;align-items:stretch;}
         <button class="status-btn" id="moreGames">🎲 Minijuegos</button>
         <button class="status-btn" id="moreTree">🌳 Árbol evolutivo</button>
         <button class="status-btn" id="moreNotifs">${pet.notifsOn ? '🔔 Avisos de hambre: ON' : '🔕 Avisos de hambre: OFF'}</button>
+        <button class="status-btn" id="moreReset" style="background:#5a2020;">🔄 Reiniciar partida</button>
       </div>
       <p class="small-note">Los avisos solo funcionan si tienes la app abierta o recién minimizada — Android puede cerrarla del todo tras un rato y entonces no llegan.</p>
       <div class="footnote">Cada usuario que abra este VPET tiene su propia mascota guardada — es personal e independiente.</div>
@@ -3617,6 +3648,7 @@ body{padding:0;align-items:stretch;}
     document.getElementById('moreBattle').onclick = ()=>{ close(); openBattleModal(); };
     document.getElementById('moreGames').onclick = ()=>{ close(); openGamesModal(); };
     document.getElementById('moreTree').onclick = ()=>{ close(); openTreeModal(); };
+    document.getElementById('moreReset').onclick = ()=>{ close(); openResetConfirmModal(); };
     document.getElementById('moreNotifs').onclick = async ()=>{
       sfx('tap');
       if(!pet.notifsOn){
@@ -3938,25 +3970,50 @@ body{padding:0;align-items:stretch;}
     return g;
   }
 
-  function build3DEyes(eyeStyle, rx, ry, sleeping, maturity){
+  function build3DEyes(eyeStyle, rx, ry, sleeping, maturity, archetype){
     maturity = maturity||0;
+    archetype = archetype||'criatura';
     // ojos grandes y redondeados con un brillo blanco arriba — el toque kawaii — en vez de las cajas
-    // planas y angulosas de antes, que se veían frías y poco expresivas
+    // planas y angulosas de antes, que se veían frías y poco expresivas. Además, cada arquetipo tiene
+    // su propia forma de ojo — no le queda bien lo mismo a un robot que a una fiera o a un bicho
     const g = new THREE.Group();
     const dark = new THREE.MeshStandardMaterial({ color:0x1a1a2a, roughness:.35, flatShading:true });
     const glow = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x66ffcc, emissiveIntensity:.8, flatShading:true });
     const sparkleMat = new THREE.MeshBasicMaterial({ color:0xffffff });
+    const slitMat = new THREE.MeshBasicMaterial({ color:0x0a0a0a });
     function tagEye(mesh){ mesh.userData.isEye = true; mesh.userData.baseScale = mesh.scale.clone(); return mesh; }
     function kawaiiEye(size, mat, addSparkle){
       const grp = new THREE.Group();
       const ball = new THREE.Mesh(new THREE.SphereGeometry(size, 9, 8), mat);
-      ball.scale.set(1, 1.3, .5); // ovalado y aplastado contra la cara, no una esfera suelta
+      if(archetype==='bestia'){
+        ball.scale.set(1.35, .85, .5); // almendrados y algo felinos, no redondos de cría
+      } else if(archetype==='fantasia'){
+        ball.scale.set(1.15, .95, .48); // afilados, con porte de reptil
+      } else if(archetype==='bicho'){
+        ball.scale.set(1.15, 1.15, .62); // grandes y abultados, casi esféricos, como ojo compuesto
+      } else if(archetype==='humanoide'){
+        ball.scale.set(1, 1.05, .48); // más contenidos, menos exagerados que el resto
+      } else {
+        ball.scale.set(1, 1.3, .5); // el ovalado kawaii clásico de la criatura
+      }
       grp.add(ball);
-      if(addSparkle){
-        const sp1 = new THREE.Mesh(new THREE.SphereGeometry(size*.34,6,6), sparkleMat);
+      if(archetype==='fantasia'){
+        // pupila rasgada vertical, en vez del brillo redondo — le da el aire de dragón/reptil
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(size*.22, size*1.3, size*.1), slitMat);
+        slit.position.set(0,0,size*.42);
+        grp.add(slit);
+        if(addSparkle){ const sp = new THREE.Mesh(new THREE.SphereGeometry(size*.16,5,5), sparkleMat); sp.position.set(size*.22, size*.32, size*.4); grp.add(sp); }
+      } else if(archetype==='bestia'){
+        // una pupila ovalada oscura y un solo brillo pequeño — más fiera, menos tierna
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(size*.5,6,6), slitMat);
+        pupil.scale.set(.7,1,.6); pupil.position.set(0,0,size*.28);
+        grp.add(pupil);
+        if(addSparkle){ const sp = new THREE.Mesh(new THREE.SphereGeometry(size*.15,5,5), sparkleMat); sp.position.set(size*.2,size*.22,size*.4); grp.add(sp); }
+      } else if(addSparkle){
+        const sp1 = new THREE.Mesh(new THREE.SphereGeometry(size*(archetype==='bicho'?.28:.34),6,6), sparkleMat);
         sp1.position.set(size*.32, size*.4, size*.32);
         grp.add(sp1);
-        if(maturity < .7){
+        if(maturity < .7 && archetype!=='humanoide'){
           // el segundo brillo, más pequeño, solo se lo dejo a las crías — de adulta ya no destella tanto
           const sp2 = new THREE.Mesh(new THREE.SphereGeometry(size*.17,5,5), sparkleMat);
           sp2.position.set(-size*.18, -size*.12, size*.34);
@@ -4233,30 +4290,51 @@ body{padding:0;align-items:stretch;}
       group.add(feat);
     } else {
       feat.position.y += headAnchor.y;
-      feat.position.z += headAnchor.z - .88;
+      feat.position.z += (archetype==='criatura') ? (headAnchor.z - .88) : headAnchor.z;
       group.add(feat);
     }
     const maturity = Math.max(0, Math.min(1, ((traits.stage!=null?traits.stage:3)-1)/4)); // 0 = cría recién nacida, 1 = forma Suprema
-    const eyes = build3DEyes(traits.eyeStyle||'redondos', headAnchor.rx, headAnchor.ry, !!traits.sleeping, maturity);
+    const eyes = build3DEyes(traits.eyeStyle||'redondos', headAnchor.rx, headAnchor.ry, !!traits.sleeping, maturity, archetype);
     eyes.position.y += headAnchor.y;
-    eyes.position.z += headAnchor.z - .88;
+    eyes.position.z += (archetype==='criatura') ? (headAnchor.z - .88) : headAnchor.z;
     group.add(eyes);
     if(!traits.sleeping){
       const face = build3DFace(headAnchor.rx, headAnchor.ry, maturity);
       face.position.y += headAnchor.y;
-      face.position.z += headAnchor.z - .88;
+      face.position.z += (archetype==='criatura') ? (headAnchor.z - .88) : headAnchor.z;
       group.add(face);
+    }
+    // manchas y rayas: cada arquetipo tiene un cuerpo con una forma y un tamaño muy distintos, así que
+    // coloco los adornos según la silueta real de cada uno — antes usaba una sola posición fija pensada
+    // solo para el cuerpo redondo de la criatura, y en el resto de formas quedaban flotando en el aire
+    const spotBounds = {
+      criatura: {x:1.2, y:.8, z:[.7,.9]},
+      humanoide:{x:.5, y:[-.15,.75], z:[.24,.3]},
+      bestia:   {x:.55, y:[-.35,.15], z:[-.6,.6]},
+      fantasia: {x:.4, y:[-.1,.5], z:[-1.1,.6]},
+      bicho:    {x:.35, y:[-.15,.2], z:[-.7,.7]}
+    }[archetype] || {x:1.2, y:.8, z:[.7,.9]};
+    function pickSpotPos(){
+      const zRange = spotBounds.z;
+      const z = Array.isArray(zRange) ? zRange[0]+Math.random()*(zRange[1]-zRange[0]) : zRange;
+      const yRange = spotBounds.y;
+      const y = Array.isArray(yRange) ? yRange[0]+Math.random()*(yRange[1]-yRange[0]) : (Math.random()-.5)*yRange;
+      return { x:(Math.random()-.5)*spotBounds.x, y, z };
     }
     if(traits.pattern==='manchas'){
       for(let i=0;i<4;i++){
+        const p = pickSpotPos();
         const spot = new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.12), new THREE.MeshStandardMaterial({color:pal.dark, flatShading:true}));
-        spot.position.set((Math.random()-.5)*1.2, (Math.random()-.5)*.8, .7+Math.random()*.2);
+        spot.position.set(p.x, p.y, p.z);
         group.add(spot);
       }
     } else if(traits.pattern==='rayas'){
+      const zMid = Array.isArray(spotBounds.z) ? (spotBounds.z[0]+spotBounds.z[1])/2 : spotBounds.z;
+      const yMid = Array.isArray(spotBounds.y) ? (spotBounds.y[0]+spotBounds.y[1])/2 : 0;
+      const yLen = Array.isArray(spotBounds.y) ? (spotBounds.y[1]-spotBounds.y[0])*1.1 : .85;
       for(let i=-1;i<=1;i++){
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(.1,.85,.1), new THREE.MeshStandardMaterial({color:pal.dark, flatShading:true}));
-        stripe.position.set(i*.32, 0, .68);
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(.1,yLen,.1), new THREE.MeshStandardMaterial({color:pal.dark, flatShading:true}));
+        stripe.position.set(i*spotBounds.x*.55, yMid, zMid);
         group.add(stripe);
       }
     }
