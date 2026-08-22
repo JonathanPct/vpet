@@ -1058,6 +1058,19 @@ body{padding:0;align-items:stretch;}
   function checkEvolution(){
     if(pet.stage===0 && pet.age>=AGE_HATCH){
       const pre = snapshotVisual(pet);
+      // antes esto solo cambiaba el número de etapa y se quedaba con los valores fijos de freshPet() —
+      // por eso nacía siempre igual. Ahora sorteo de verdad el color, cuerpo, rasgo, ojos y patrón
+      const seed = Math.floor(Math.random()*4294967295);
+      const rand = mulberry32(seed+1);
+      const affinity = computeAffinity();
+      const w = AFFINITY_WEIGHTS[affinity] || AFFINITY_WEIGHTS.equilibrado;
+      pet.speciesSeed = seed;
+      pet.hue = Math.floor(rand()*360);
+      pet.archetype = pickArchetype(rand);
+      pet.bodyShape = weightedPick(rand, EVO_SHAPE_OPTS, w.shape);
+      pet.featureType = weightedPick(rand, EVO_FEAT_OPTS, w.feat);
+      pet.eyeStyle = EVO_EYE_OPTS[Math.floor(rand()*EVO_EYE_OPTS.length)];
+      pet.pattern = EVO_PATTERN_OPTS[Math.floor(rand()*EVO_PATTERN_OPTS.length)];
       pet.stage=1;
       const post = snapshotVisual(pet);
       sfx('hatch');
