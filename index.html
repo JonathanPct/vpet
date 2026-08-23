@@ -1066,7 +1066,7 @@ body{padding:0;align-items:stretch;}
       const w = AFFINITY_WEIGHTS[affinity] || AFFINITY_WEIGHTS.equilibrado;
       pet.speciesSeed = seed;
       pet.hue = Math.floor(rand()*360);
-      pet.archetype = pickArchetype(rand);
+      pet.archetype = 'criatura'; // la raza especial se gana en la evolución grande, no sale de golpe en el huevo
       pet.bodyShape = weightedPick(rand, EVO_SHAPE_OPTS, w.shape);
       pet.featureType = weightedPick(rand, EVO_FEAT_OPTS, w.feat);
       pet.eyeStyle = EVO_EYE_OPTS[Math.floor(rand()*EVO_EYE_OPTS.length)];
@@ -1369,11 +1369,11 @@ body{padding:0;align-items:stretch;}
     ctx.beginPath(); ctx.ellipse(cx*cell, (cy+7)*cell, 5*cell,1.1*cell,0,0,Math.PI*2); ctx.fill();
   }
 
-  function drawCreature(pet, transparent){
+  function drawCreature(pet, transparent, cxOverride, cyOverride){
     const {stage, frame, sick, sleeping, temperament} = pet;
     if(transparent){ ctx.clearRect(0,0,canvas.width,canvas.height); }
     else { drawSceneBackground(pet.bgSeed); }
-    const cx=12, cy=transparent ? 13.5 : (canvas.height/cell)/2;
+    const cx=cxOverride!=null?cxOverride:12, cy=cyOverride!=null?cyOverride:(transparent ? 13.5 : (canvas.height/cell)/2);
     const sizes = {1:[4.6,4.2],2:[5.6,5.0],3:[6.8,6.2],4:[7.8,7.2],5:[8.8,8.2]};
     let [rx,ry] = sizes[stage];
     if(stage>=3){
@@ -1412,21 +1412,29 @@ body{padding:0;align-items:stretch;}
       else if(feat==='caparazon') drawCaparazon(cx,bcy,rx,ry,featScale,pal.accent);
     }
 
-    // el cuerpo
-    ellipseCells(cx,bcy,rx,ry).forEach(([gx,gy])=>px(gx,gy,pal.body));
-    // la barriguita más clara
-    ellipseCells(cx,bcy+ry*0.28,rx*0.62,ry*0.5).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    // el cuerpo: cada arquetipo tiene su propia silueta a partir de la evolución grande — antes
+    // todos usaban el mismo óvalo genérico, ahora bestia/humanoide/fantasía/bicho se ven distintos de verdad
+    const archetype = stage>=3 ? (pet.archetype||'criatura') : 'criatura';
+    let head = { headCx:cx, headCy:bcy-ry*0.12, headR:Math.min(rx,ry)*0.55 };
+    if(archetype==='bestia') head = drawBodyBestia(cx,bcy,rx,ry,pal);
+    else if(archetype==='humanoide') head = drawBodyHumanoide(cx,bcy,rx,ry,pal);
+    else if(archetype==='fantasia') head = drawBodyFantasy(cx,bcy,rx,ry,pal);
+    else if(archetype==='bicho') head = drawBodyBicho(cx,bcy,rx,ry,pal);
+    else {
+      ellipseCells(cx,bcy,rx,ry).forEach(([gx,gy])=>px(gx,gy,pal.body));
+      ellipseCells(cx,bcy+ry*0.28,rx*0.62,ry*0.5).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    }
     // el patrón propio de esta especie (liso, manchas, rayas o estrellado), desde Joven en adelante
-    if(stage>=3 && pet.pattern && pet.pattern!=='liso'){
+    if(stage>=3 && pet.pattern && pet.pattern!=='liso' && archetype==='criatura'){
       drawPattern(cx,bcy,rx,ry,pet.pattern,pal.dark);
     }
 
-    // patitas cortas, desde que es Pequeño en adelante
+    // patitas cortas, desde que es Pequeño en adelante — solo la criatura clásica, las demás ya traen las suyas
     if(stage>=2 && stage<=2){
       px(cx-rx*0.55,bcy+ry*0.85,pal.dark,1.4,1.1);
       px(cx+rx*0.15,bcy+ry*0.85,pal.dark,1.4,1.1);
     }
-    if(stage>=3){
+    if(stage>=3 && archetype==='criatura'){
       px(cx-rx*0.55,bcy+ry*0.9,pal.dark,1.6,1.3);
       px(cx+rx*0.2,bcy+ry*0.9,pal.dark,1.6,1.3);
     }
@@ -1440,51 +1448,70 @@ body{padding:0;align-items:stretch;}
       px(cx-0.7,bcy-ry-2,pal.accent,1.4,0.9);
     }
 
-    // los ojos, con el estilo propio de esta especie
+    // los ojos van sobre la cabeza real de cada arquetipo, no siempre en el centro del cuerpo
+    const fcx = head.headCx, fcy = head.headCy, fr = head.headR;
+    const maturity = Math.max(0, Math.min(1, (stage-1)/4));
+    const isBaby = maturity < .32;
     const eyeStyle = stage>=3 ? (pet.eyeStyle||'redondos') : 'redondos';
-    const eyeY = bcy - ry*0.12;
-    const eyeDX = eyeStyle==='ciclope' ? 0 : rx*0.42;
+    const eyeY = fcy - fr*0.08;
+    const eyeDX = eyeStyle==='ciclope' ? 0 : fr*0.6;
     if(sleeping){
-      if(eyeStyle==='ciclope'){ px(cx-0.8,eyeY,'#1a2620',1.6,0.5); }
-      else{ px(cx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); px(cx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); }
+      if(eyeStyle==='ciclope'){ px(fcx-0.8,eyeY,'#1a2620',1.6,0.5); }
+      else{ px(fcx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); px(fcx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); }
       ctx.fillStyle='#dfeee6';
       ctx.font='700 22px monospace';
       ctx.fillText('Z', (cx+rx+1)*cell, (bcy-ry-2+((frame%16<8)?0:-1))*cell);
     } else if(sick){
       // ojos huecos/mareados, para cuando está enfermo
-      px(cx-eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
-      px(cx-eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
-      px(cx+eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
-      px(cx+eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
+      px(fcx-eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
+      px(fcx-eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
+      px(fcx+eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
+      px(fcx+eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
     } else {
       const blink = frame%20>=18;
       const eh = blink?0.4:1.5;
-      if(eyeStyle==='ciclope'){
-        px(cx-1.1,eyeY+(2.2-eh)/2,'#1a2620',2.2,eh+0.7);
-      } else if(eyeStyle==='rasgados'){
-        px(cx-eyeDX-0.4,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
-        px(cx+eyeDX-0.8,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
-      } else if(eyeStyle==='trio'){
-        px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
-        px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
-        px(cx-0.5,eyeY+ry*0.35,'#1a2620',1.0,eh*0.7);
-      } else if(eyeStyle==='dormidos'){
-        px(cx-eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
-        px(cx+eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
-      } else if(eyeStyle==='brillantes'){
-        px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-        px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-        px(cx-eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
-        px(cx+eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
+      if(isBaby){
+        // cría: ojo kawaii redondo con un brillito, tal y como estaba
+        if(eyeStyle==='ciclope'){
+          px(fcx-1.1,eyeY+(2.2-eh)/2,'#1a2620',2.2,eh+0.7);
+          if(!blink) px(fcx-0.5,eyeY+0.3,'#ffffff',0.6,0.6);
+        } else if(eyeStyle==='rasgados'){
+          px(fcx-eyeDX-0.4,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
+          px(fcx+eyeDX-0.8,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
+        } else if(eyeStyle==='trio'){
+          px(fcx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
+          px(fcx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
+          px(fcx-0.5,eyeY-fr*0.9,'#1a2620',1.0,eh*0.7); // el tercer ojo va arriba, en la frente, no como nariz
+        } else if(eyeStyle==='dormidos'){
+          px(fcx-eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
+          px(fcx+eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
+        } else if(eyeStyle==='brillantes'){
+          px(fcx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+          px(fcx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+          px(fcx-eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
+          px(fcx+eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
+        } else {
+          px(fcx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+          px(fcx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+        }
+        if(!blink && eyeStyle!=='ciclope'){ px(fcx-eyeDX-0.2,eyeY+0.1,'#ffffff',0.5,0.5); px(fcx+eyeDX-0.2,eyeY+0.1,'#ffffff',0.5,0.5); }
       } else {
-        px(cx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-        px(cx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+        // a partir de aquí, ojo rasgado con línea de párpado marcada — el estilo "serio" para todo lo
+        // que no sea cría, en vez de la misma bola kawaii encogida
+        [-1,1].forEach(side=>{
+          if(eyeStyle==='ciclope' && side===-1) return;
+          const ex = eyeStyle==='ciclope' ? fcx : fcx+side*eyeDX;
+          px(ex-1.1,eyeY+(1.6-eh)/2,'#1a2620',1.7,eh);
+          px(ex+.55*side,eyeY+(1.6-eh)/2-.15,'#1a2620',.5,.5); // punta afilada en la esquina exterior
+          px(ex-1.15,eyeY-eh*.35,'#1a2620',2.0,.35); // línea de párpado, gruesa, por encima
+          if(!blink) px(ex-.3,eyeY+.1,'#ffffff',.4,.4);
+        });
       }
     }
 
     // la boquita
     if(!sleeping){
-      px(cx-0.7,bcy+ry*0.42,'#1a2620',1.4,0.5);
+      px(fcx-0.7,fcy+fr*0.65,'#1a2620',1.4,0.5);
     }
 
     // el detallito del temperamento, desde que es Pequeño
@@ -1500,6 +1527,84 @@ body{padding:0;align-items:stretch;}
     ctx.filter='none';
   }
 
+  function drawBodyBestia(cx,cy,rx,ry,pal){
+    const bodyRx=rx*1.05, bodyRy=ry*0.6;
+    // cola primero, para que quede detrás del cuerpo
+    px(cx-bodyRx*1.05,cy-bodyRy*0.35,pal.body,rx*0.22,ry*0.32);
+    px(cx-bodyRx*1.18,cy-bodyRy*0.75,pal.dark,rx*0.2,ry*0.28);
+    ellipseCells(cx,cy,bodyRx,bodyRy).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    ellipseCells(cx,cy+bodyRy*0.35,bodyRx*0.68,bodyRy*0.55).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    const headR=ry*0.56, headCx=cx+bodyRx*0.82, headCy=cy-bodyRy*0.2;
+    // orejas, detrás de la cabeza
+    px(headCx-headR*0.55,headCy-headR*1.15,pal.dark,headR*0.55,headR*0.7);
+    px(headCx+headR*0.15,headCy-headR*1.15,pal.dark,headR*0.55,headR*0.7);
+    ellipseCells(headCx,headCy,headR,headR*0.92).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    // careta clara en el hocico, como un lobo de verdad
+    ellipseCells(headCx+headR*0.55,headCy+headR*0.2,headR*0.55,headR*0.45).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    px(headCx+headR*0.95,headCy+headR*0.15,pal.dark,headR*0.28,headR*0.22);
+    // patas
+    [[-0.75,'front'],[-0.15,'front'],[0.35,'back'],[0.82,'back']].forEach(([ox])=>{
+      px(cx+bodyRx*ox-rx*0.13,cy+bodyRy*0.55,pal.dark,rx*0.26,ry*0.62);
+      px(cx+bodyRx*ox-rx*0.13,cy+bodyRy*1.05,pal.dark2||pal.dark,rx*0.26,ry*0.18);
+    });
+    return { headCx, headCy, headR };
+  }
+  function drawBodyHumanoide(cx,cy,rx,ry,pal){
+    const headR=ry*0.42, headCx=cx, headCy=cy-ry*0.42;
+    const torsoW=rx*0.95, torsoH=ry*0.95;
+    // piernas y brazos primero, para que el torso quede encima
+    px(cx-torsoW*0.65,cy+torsoH*0.35,pal.dark,rx*0.24,ry*0.85); // brazo izq
+    px(cx+torsoW*0.41,cy+torsoH*0.35,pal.dark,rx*0.24,ry*0.85); // brazo der
+    px(cx-torsoW*0.32,cy+torsoH*0.85,pal.body,rx*0.28,ry*0.85); // pierna izq
+    px(cx+torsoW*0.04,cy+torsoH*0.85,pal.body,rx*0.28,ry*0.85); // pierna der
+    px(cx-torsoW*0.34,cy+torsoH*1.55,pal.dark,rx*0.32,ry*0.22); // bota izq
+    px(cx+torsoW*0.02,cy+torsoH*1.55,pal.dark,rx*0.32,ry*0.22); // bota der
+    px(cx-torsoW*0.48,cy-torsoH*0.05,pal.body,torsoW,torsoH); // torso
+    px(cx-torsoW*0.3,cy-torsoH*0.02,pal.dark,torsoW*0.6,torsoH*0.75); // peto
+    // pelo y cabeza
+    px(headCx-headR*1.05,headCy-headR*1.15,pal.dark,headR*2.1,headR*0.7);
+    ellipseCells(headCx,headCy,headR,headR*0.95).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    return { headCx, headCy, headR };
+  }
+  function drawBodyFantasy(cx,cy,rx,ry,pal){
+    const bodyRx=rx*0.85, bodyRy=ry*0.68;
+    // cola larga curvándose hacia atrás
+    px(cx-bodyRx*1.3,cy+bodyRy*0.1,pal.body,rx*0.5,ry*0.22);
+    px(cx-bodyRx*1.7,cy-bodyRy*0.15,pal.dark,rx*0.3,ry*0.18);
+    // alas, detrás del cuerpo
+    px(cx-bodyRx*0.3,cy-bodyRy*1.5,pal.dark,rx*0.7,ry*1.15);
+    px(cx+bodyRx*0.1,cy-bodyRy*1.55,pal.accent,rx*0.55,ry*0.9);
+    ellipseCells(cx,cy,bodyRx,bodyRy).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    ellipseCells(cx,cy+bodyRy*0.4,bodyRx*0.55,bodyRy*0.4).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    // patas
+    px(cx-bodyRx*0.5,cy+bodyRy*0.75,pal.dark,rx*0.22,ry*0.4);
+    px(cx+bodyRx*0.3,cy+bodyRy*0.75,pal.dark,rx*0.22,ry*0.4);
+    // cuello curvado, en dos tramos, hacia arriba y adelante
+    const headR=ry*0.4, headCx=cx+bodyRx*0.95, headCy=cy-bodyRy*1.5;
+    px(cx+bodyRx*0.55,cy-bodyRy*0.4,pal.body,rx*0.32,ry*0.6);
+    px(cx+bodyRx*0.78,cy-bodyRy*1.05,pal.body,rx*0.3,ry*0.55);
+    // pua/cresta en el cuello
+    px(headCx-headR*0.3,headCy-headR*0.6,pal.dark,headR*0.4,headR*0.8);
+    ellipseCells(headCx,headCy,headR,headR*0.9).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    return { headCx, headCy, headR };
+  }
+  function drawBodyBicho(cx,cy,rx,ry,pal){
+    const abdomenRx=rx*0.85, abdomenRy=ry*0.62;
+    // patas, detrás del cuerpo, tres pares
+    for(let i=-1;i<=1;i++){
+      px(cx-abdomenRx*0.3+i*abdomenRx*0.45,cy+abdomenRy*0.5,pal.dark,rx*0.06,ry*0.5);
+      px(cx-abdomenRx*0.3+i*abdomenRx*0.45-rx*0.16,cy+abdomenRy*0.9,pal.dark,rx*0.06,ry*0.3);
+    }
+    ellipseCells(cx-abdomenRx*0.15,cy,abdomenRx,abdomenRy).forEach(([gx,gy])=>px(gx,gy,pal.dark));
+    // bandas del caparazon
+    for(let i=0;i<3;i++){ px(cx-abdomenRx*0.9+i*abdomenRx*0.65,cy-abdomenRy*0.9,pal.body,rx*0.06,ry*1.8); }
+    const headR=ry*0.4, headCx=cx+abdomenRx*0.85, headCy=cy-abdomenRy*0.05;
+    ellipseCells(headCx,headCy,headR,headR*0.9).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    // antenas
+    px(headCx+headR*0.1,headCy-headR*1.3,pal.dark,headR*0.22,headR*0.9);
+    px(headCx+headR*0.65,headCy-headR*1.2,pal.dark,headR*0.22,headR*0.8);
+    return { headCx, headCy, headR };
+  }
   function drawWings(cx,cy,rx,ry,scale,color){
     const w=1.6*scale, h=3.2*scale;
     px(cx-rx-w*0.9, cy-h*0.3, color, w, h*0.5);
@@ -1620,7 +1725,7 @@ body{padding:0;align-items:stretch;}
     removeGameOver();
 
     pet.frame = (pet.frame||0)+1;
-    update3DMainScene();
+    render2DFallback();
   }
 
   function refreshScrollLock(){
@@ -2079,117 +2184,15 @@ body{padding:0;align-items:stretch;}
     const closeBattleBtn = document.getElementById('closeBattle');
     if(closeBattleBtn) closeBattleBtn.style.display = on ? 'none' : '';
   }
-  // ---------- efectos de combate: números de daño, partículas, temblor de cámara, destellos ----------
-  function projectToScreen(worldPos){
-    const v = worldPos.clone().project(dungeonScene3D.camera);
-    return { x: (v.x*.5+.5)*window.innerWidth, y: (-v.y*.5+.5)*window.innerHeight };
-  }
-  function spawnDamageNumber3D(worldPos, amount, kind){
-    if(amount<=0) return;
-    const p = projectToScreen(worldPos);
-    const el = document.createElement('div');
-    el.className = 'dmg-number' + (kind==='crit' ? ' dmg-crit' : '') + (kind==='heal' ? ' dmg-heal' : '');
-    el.textContent = (kind==='heal' ? '+' : '-') + amount;
-    el.style.left = p.x+'px'; el.style.top = p.y+'px';
-    document.body.appendChild(el);
-    setTimeout(()=>el.remove(), 900);
-  }
-  function spawnHitParticles3D(worldPos, color, count){
-    if(!dungeonScene3D) return;
-    const mat = new THREE.MeshBasicMaterial({ color });
-    for(let i=0;i<count;i++){
-      const size = .04+Math.random()*.05;
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), mat);
-      mesh.position.copy(worldPos);
-      const ang = Math.random()*Math.PI*2, spd = .04+Math.random()*.08;
-      const vel = new THREE.Vector3(Math.cos(ang)*spd, .05+Math.random()*.09, Math.sin(ang)*spd*.4);
-      dungeonScene3D.scene.add(mesh);
-      dungeonScene3D.particles.push({ mesh, vel, life:0, maxLife:26+Math.random()*10 });
-    }
-  }
-  function advanceHitParticles3D(){
-    if(!dungeonScene3D) return;
-    dungeonScene3D.particles = dungeonScene3D.particles.filter(p=>{
-      p.life++;
-      p.vel.y -= .006; // gravedad
-      p.mesh.position.add(p.vel);
-      p.mesh.rotation.x += .2; p.mesh.rotation.y += .16;
-      p.mesh.material.opacity = Math.max(0, 1 - p.life/p.maxLife);
-      p.mesh.material.transparent = true;
-      if(p.life>=p.maxLife){ dungeonScene3D.scene.remove(p.mesh); p.mesh.geometry.dispose(); return false; }
-      return true;
-    });
-  }
-  function triggerScreenShake(intensity){
-    if(!dungeonScene3D) return;
-    dungeonScene3D.shake = { intensity, start:performance.now(), dur:280 };
-  }
-  function applyScreenShake(){
-    if(!dungeonScene3D || !dungeonScene3D.shake) return {x:0,y:0};
-    const { intensity, start, dur } = dungeonScene3D.shake;
-    const el = performance.now()-start;
-    if(el>dur){ dungeonScene3D.shake=null; return {x:0,y:0}; }
-    const decay = 1-(el/dur);
-    return { x:(Math.random()-.5)*intensity*decay, y:(Math.random()-.5)*intensity*decay };
-  }
-  function triggerImpactFlash(color){
-    const el = document.createElement('div');
-    el.className = 'dg-impact-flash';
-    el.style.background = color;
-    document.body.appendChild(el);
-    requestAnimationFrame(()=>{ el.style.opacity = '0'; });
-    setTimeout(()=>el.remove(), 260);
-  }
-  function spawnShieldBlock3D(worldPos){
-    if(!dungeonScene3D) return;
-    const geo = new THREE.RingGeometry(.05,.32,6);
-    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color:0x6fd8ff, transparent:true, opacity:.9, side:THREE.DoubleSide }));
-    mesh.position.copy(worldPos);
-    dungeonScene3D.scene.add(mesh);
-    dungeonScene3D.shields.push({ mesh, life:0 });
-    spawnHitParticles3D(worldPos, 0x9fe8ff, 8);
-  }
-  function advanceShields3D(){
-    if(!dungeonScene3D) return;
-    dungeonScene3D.shields = dungeonScene3D.shields.filter(s=>{
-      s.life++;
-      s.mesh.scale.setScalar(1+s.life*.08);
-      s.mesh.material.opacity = Math.max(0,.9-s.life*.07);
-      s.mesh.rotation.z += .1;
-      if(s.life>13){ dungeonScene3D.scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); return false; }
-      return true;
-    });
-  }
-  function spawnChargeGlow3D(side){
-    if(!dungeonScene3D) return;
-    const group = side==='me' ? dungeonScene3D.meGroup : dungeonScene3D.monGroup;
-    const glow = new THREE.Mesh(new THREE.SphereGeometry(.5,10,10), new THREE.MeshBasicMaterial({ color:0xffcf5e, transparent:true, opacity:.5 }));
-    glow.position.set(0,.2,0);
-    group.add(glow);
-    dungeonScene3D.charges.push({ mesh:glow, life:0 });
-  }
-  function advanceCharges3D(){
-    if(!dungeonScene3D) return;
-    dungeonScene3D.charges = dungeonScene3D.charges.filter(c=>{
-      c.life++;
-      const s = 1+Math.sin(c.life*.35)*.25;
-      c.mesh.scale.setScalar(s);
-      c.mesh.material.opacity = Math.max(0, .55 - c.life*.018);
-      if(c.life>28){ c.mesh.parent.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh.material.dispose(); return false; }
-      return true;
-    });
-  }
 
   function stopDungeonScene(){
     if(dungeonScene3D){
       if(dungeonScene3D.raf) cancelAnimationFrame(dungeonScene3D.raf);
       if(dungeonScene3D.onResize) window.removeEventListener('resize', dungeonScene3D.onResize);
-      disposeThreeRenderer(dungeonScene3D.renderer);
       dungeonScene3D = null;
     }
   }
-  // ---------- el fondo de las peleas lo pinto en 2D, bien detallado, y dejo el cielo del 3D transparente
-  // encima — así los luchadores siguen siendo 3D de verdad pero el paisaje de fondo no se queda plano ----------
+  // ---------- el fondo de las peleas lo pinto en 2D, bien detallado ----------
   function draw2DBattleBackdrop(canvas, theme){
     const dpr = Math.min(window.devicePixelRatio||1, 2);
     canvas.width = window.innerWidth*dpr; canvas.height = window.innerHeight*dpr;
@@ -2408,115 +2411,171 @@ body{padding:0;align-items:stretch;}
     if(bgCanvas) draw2DBattleBackdrop(bgCanvas, theme);
     const canvasEl = document.getElementById('dgCanvas');
     if(!canvasEl) return;
-    const renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
-    const scene = new THREE.Scene();
-    buildDungeonEnvironment(scene);
-    const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, .1, 100);
-    camera.position.set(0,1.3,11.5);
-    camera.lookAt(0,.1,0);
-    const dir = new THREE.DirectionalLight(0xffffff,.7); dir.position.set(2,4,3); scene.add(dir);
-    const meGroup = new THREE.Group(); meGroup.position.set(-1.35,0,0);
-    const monGroup = new THREE.Group(); monGroup.position.set(1.35,0,0); monGroup.rotation.y = Math.PI;
-    scene.add(meGroup); scene.add(monGroup);
-    dungeonScene3D = { renderer, scene, camera, meGroup, monGroup, meModel:null, monModel:null, bobT:0, raf:null, attack:null, particles:[], shields:[], charges:[], shake:null, baseCamPos:camera.position.clone() };
-    function onResize(){
-      if(!dungeonScene3D) return;
-      renderer.setSize(window.innerWidth, window.innerHeight, false);
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
+    const ctx2 = canvasEl.getContext('2d');
+    ctx2.imageSmoothingEnabled = false;
+    function resize(){
+      const dpr = Math.min(window.devicePixelRatio||1, 2);
+      canvasEl.width = Math.round(window.innerWidth*dpr);
+      canvasEl.height = Math.round(window.innerHeight*dpr);
+      ctx2.setTransform(dpr,0,0,dpr,0,0);
       const bg = document.getElementById('dg2dBg');
       if(bg) draw2DBattleBackdrop(bg, theme);
     }
-    window.addEventListener('resize', onResize);
-    dungeonScene3D.onResize = onResize;
+    dungeonScene3D = { ctx2, canvasEl, meTraits:null, monTraits:null, bobT:0, raf:null, attack:null, particles:[], shields:[], charges:[], shake:null, onResize:resize };
+    resize();
+    window.addEventListener('resize', resize);
     function loop(){
       if(!dungeonScene3D) return;
-      dungeonScene3D.bobT += .04;
-      const bob = Math.sin(dungeonScene3D.bobT)*.05;
-      if(dungeonScene3D.meModel) dungeonScene3D.meModel.position.y = bob;
-      if(dungeonScene3D.monModel) dungeonScene3D.monModel.position.y = Math.sin(dungeonScene3D.bobT+1)*.05;
+      dungeonScene3D.bobT += .06;
       applyDungeonAttack();
-      advanceHitParticles3D();
-      advanceShields3D();
-      advanceCharges3D();
-      const shakeOff = applyScreenShake();
-      camera.position.x = dungeonScene3D.baseCamPos.x + shakeOff.x;
-      camera.position.y = dungeonScene3D.baseCamPos.y + shakeOff.y;
-      renderer.render(scene, camera);
+      drawBattleFighters2D();
       dungeonScene3D.raf = requestAnimationFrame(loop);
     }
     loop();
   }
+  function drawBattleFighters2D(){
+    const s = dungeonScene3D;
+    if(!s) return;
+    const w = window.innerWidth, h = window.innerHeight;
+    s.ctx2.clearRect(0,0,w,h);
+    const groundY = h*.62;
+    const scaleFactor = Math.min(w,h)/380; // referencia pensada para un móvil normal, escalo proporcional al resto
+    const shakeOff = applyScreenShake();
+    // avanzo los efectos antes de dibujar, para que salgan en la misma posición que los luchadores de este fotograma
+    advanceHitParticles3D(); advanceShields3D(); advanceCharges3D();
+    [['me',-1],['mon',1]].forEach(([side,dir])=>{
+      const traits = side==='me' ? s.meTraits : s.monTraits;
+      if(!traits) return;
+      const bob = Math.sin(s.bobT + (side==='me'?0:1))*4;
+      let lungeOff = 0, tiltOff = 0, chargeGlow = 0;
+      if(s.attack && s.attack.side===side){
+        const el = performance.now()-s.attack.start, t=Math.min(1,el/550);
+        const lunge = Math.sin(t*Math.PI);
+        lungeOff = -dir*lunge*46;
+        if(s.attack.moveType==='Especial') chargeGlow = 1-t;
+      }
+      if(s.attack && s.attack.side!==side && s.defShakeUntil>performance.now()){
+        tiltOff = Math.sin(performance.now()*.09)*4;
+      }
+      const baseX = w*.5 + dir*w*.22;
+      const px2 = baseX + lungeOff + shakeOff.x + tiltOff;
+      const py2 = groundY + bob + shakeOff.y;
+      s.ctx2.save();
+      s.ctx2.translate(px2, py2);
+      s.ctx2.scale(dir<0?scaleFactor:-scaleFactor, scaleFactor); // el de la derecha mira hacia la izquierda, como cara a cara
+      if(chargeGlow>0){
+        s.ctx2.fillStyle = `rgba(255,207,94,${.35*chargeGlow})`;
+        s.ctx2.beginPath(); s.ctx2.arc(0,-40,50+10*Math.sin(performance.now()*.02),0,Math.PI*2); s.ctx2.fill();
+      }
+      useCanvas(dummyCanvas2D);
+      drawCreature({...traits, frame:pet.frame||0, sleeping:false, sick:false}, true, 12, 13.5);
+      s.ctx2.drawImage(dummyCanvas2D, -dummyCanvas2D.width/(2*cell), -dummyCanvas2D.height/(1.55*cell), dummyCanvas2D.width/cell, dummyCanvas2D.height/cell);
+      useScreenCanvas();
+      s.ctx2.restore();
+    });
+    // partículas, escudos y destellos de carga, ya en coordenadas de pantalla
+    s.particles.forEach(p=>{
+      s.ctx2.fillStyle = p.color; s.ctx2.globalAlpha = Math.max(0,1-p.life/p.maxLife);
+      s.ctx2.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+    });
+    s.ctx2.globalAlpha = 1;
+    s.shields.forEach(sh=>{
+      s.ctx2.strokeStyle = `rgba(111,216,255,${Math.max(0,.9-sh.life*.07)})`;
+      s.ctx2.lineWidth = 3;
+      s.ctx2.beginPath(); s.ctx2.arc(sh.x,sh.y,14+sh.life*3,0,Math.PI*2); s.ctx2.stroke();
+    });
+  }
   function setDungeonFighters(meTraits, monTraits){
     if(!dungeonScene3D) return;
-    if(dungeonScene3D.meModel){ dungeonScene3D.meGroup.remove(dungeonScene3D.meModel); disposeObject3D(dungeonScene3D.meModel); }
-    if(dungeonScene3D.monModel){ dungeonScene3D.monGroup.remove(dungeonScene3D.monModel); disposeObject3D(dungeonScene3D.monModel); }
-    const FIGHTER_SCALE = .48; // en cara a cara reduzco el tamaño real, si no ocupan casi toda la pantalla y se pisan al atacar
-    const meModel = meTraits ? build3DCreature(meTraits) : build3DEgg();
-    const meScale = (meModel.userData.baseScale||1) * FIGHTER_SCALE;
-    meModel.scale.setScalar(meScale);
-    meModel.rotation.y = Math.PI/2 - .3;
-    dungeonScene3D.meGroup.add(meModel);
-    dungeonScene3D.meModel = meModel;
-    const monModel = build3DCreature(monTraits);
-    const monScale = (monModel.userData.baseScale||1) * FIGHTER_SCALE;
-    monModel.scale.setScalar(monScale);
-    monModel.rotation.y = Math.PI/2 - .3;
-    dungeonScene3D.monGroup.add(monModel);
-    dungeonScene3D.monModel = monModel;
+    dungeonScene3D.meTraits = meTraits || {stage:0};
+    dungeonScene3D.monTraits = monTraits;
   }
   function playDungeonAttack(side, moveType, damage, blocked){
     // ataca de verdad: se lanza hacia el rival, y en el instante del choque disparo números de daño,
     // partículas, temblor de cámara y destello — con su propio look según sea Ataque, Especial o un bloqueo
     if(!dungeonScene3D) return;
     dungeonScene3D.attack = { side, start:performance.now(), moveType, damage:Math.max(0,Math.round(damage||0)), blocked:!!blocked, impactDone:false };
-    if(moveType==='Especial') spawnChargeGlow3D(side);
   }
   function applyDungeonAttack(){
     if(!dungeonScene3D || !dungeonScene3D.attack) return;
     const atk = dungeonScene3D.attack;
     const el = performance.now() - atk.start;
     const dur = 550;
-    const atkGroup = atk.side==='me' ? dungeonScene3D.meGroup : dungeonScene3D.monGroup;
-    const defGroup = atk.side==='me' ? dungeonScene3D.monGroup : dungeonScene3D.meGroup;
-    const defModel = atk.side==='me' ? dungeonScene3D.monModel : dungeonScene3D.meModel;
-    if(el > dur){
-      atkGroup.position.x = atk.side==='me' ? -1.35 : 1.35;
-      atkGroup.rotation.z = 0;
-      if(defModel) defModel.rotation.z = 0;
-      dungeonScene3D.attack = null;
-      return;
-    }
-    const t = el/dur, lunge = Math.sin(t*Math.PI); // va y vuelve en una curva suave
-    const baseX = atk.side==='me' ? -1.35 : 1.35;
-    const dirSign = atk.side==='me' ? 1 : -1;
-    atkGroup.position.x = baseX + dirSign*lunge*.32; // se acerca lo justo para el choque, sin llegar a pisar al rival
-    atkGroup.rotation.z = dirSign*lunge*-.12;
+    if(el > dur){ dungeonScene3D.attack = null; return; }
+    const t = el/dur;
     if(!atk.impactDone && t>=.48){
       atk.impactDone = true;
-      const worldImpact = new THREE.Vector3();
-      defGroup.getWorldPosition(worldImpact);
-      worldImpact.y += .3;
+      const w = window.innerWidth, h = window.innerHeight;
+      const defSide = atk.side==='me' ? 1 : -1;
+      const impactX = w*.5 + defSide*w*.14, impactY = h*.62-40;
+      dungeonScene3D.defShakeUntil = performance.now()+330;
       if(atk.blocked){
-        spawnShieldBlock3D(worldImpact);
+        spawnShieldBlock3D(impactX, impactY);
         sfx('hit');
-        triggerScreenShake(.03);
+        triggerScreenShake(3);
       } else {
         const isEspecial = atk.moveType==='Especial';
-        spawnHitParticles3D(worldImpact, isEspecial?0xffcf5e:0xff5c5c, isEspecial?16:10);
+        spawnHitParticles3D(impactX, impactY, isEspecial?'#ffcf5e':'#ff5c5c', isEspecial?16:10);
         triggerImpactFlash(isEspecial ? 'rgba(255,207,94,.35)' : 'rgba(255,60,60,.3)');
-        triggerScreenShake(isEspecial ? .12 : .07);
-        spawnDamageNumber3D(worldImpact, atk.damage, isEspecial?'crit':'normal');
+        triggerScreenShake(isEspecial?9:5);
+        spawnDamageNumber3D(impactX, impactY, atk.damage, isEspecial?'crit':'normal');
       }
     }
-    if(defModel && t>.42 && t<.75){
-      defModel.rotation.z = Math.sin((t-.42)*22)*(atk.blocked?.03:(atk.moveType==='Especial'?.13:.09));
-    } else if(defModel){
-      defModel.rotation.z = 0;
+  }
+  // ---------- efectos de combate: números de daño, partículas, temblor de cámara, destellos ----------
+  function spawnDamageNumber3D(x, y, amount, kind){
+    if(amount<=0) return;
+    const el = document.createElement('div');
+    el.className = 'dmg-number' + (kind==='crit' ? ' dmg-crit' : '') + (kind==='heal' ? ' dmg-heal' : '');
+    el.textContent = (kind==='heal' ? '+' : '-') + amount;
+    el.style.left = x+'px'; el.style.top = y+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 900);
+  }
+  function spawnHitParticles3D(x, y, color, count){
+    if(!dungeonScene3D) return;
+    for(let i=0;i<count;i++){
+      const ang = Math.random()*Math.PI*2, spd = 1.5+Math.random()*3;
+      dungeonScene3D.particles.push({ x,y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd-1.5, color, size:3+Math.random()*3, life:0, maxLife:20+Math.random()*10 });
     }
   }
+  function advanceHitParticles3D(){
+    if(!dungeonScene3D) return;
+    dungeonScene3D.particles = dungeonScene3D.particles.filter(p=>{
+      p.life++; p.vy += .2; p.x += p.vx; p.y += p.vy;
+      return p.life < p.maxLife;
+    });
+  }
+  function triggerScreenShake(intensity){
+    if(!dungeonScene3D) return;
+    dungeonScene3D.shake = { intensity, start:performance.now(), dur:280 };
+  }
+  function applyScreenShake(){
+    if(!dungeonScene3D || !dungeonScene3D.shake) return {x:0,y:0};
+    const { intensity, start, dur } = dungeonScene3D.shake;
+    const el = performance.now()-start;
+    if(el>dur){ dungeonScene3D.shake=null; return {x:0,y:0}; }
+    const decay = 1-(el/dur);
+    return { x:(Math.random()-.5)*intensity*decay, y:(Math.random()-.5)*intensity*decay };
+  }
+  function triggerImpactFlash(color){
+    const el = document.createElement('div');
+    el.className = 'dg-impact-flash';
+    el.style.background = color;
+    document.body.appendChild(el);
+    requestAnimationFrame(()=>{ el.style.opacity = '0'; });
+    setTimeout(()=>el.remove(), 260);
+  }
+  function spawnShieldBlock3D(x, y){
+    if(!dungeonScene3D) return;
+    dungeonScene3D.shields.push({ x, y, life:0 });
+    spawnHitParticles3D(x, y, '#9fe8ff', 8);
+  }
+  function advanceShields3D(){
+    if(!dungeonScene3D) return;
+    dungeonScene3D.shields = dungeonScene3D.shields.filter(s=>{ s.life++; return s.life<=13; });
+  }
+  function advanceCharges3D(){ /* la carga de Especial ahora se dibuja directamente en drawBattleFighters2D */ }
 
   function render3DMiniPreview(canvasEl, traitsOrNull){
     if(typeof THREE==='undefined' || !canvasEl) return;
@@ -3821,9 +3880,12 @@ body{padding:0;align-items:stretch;}
     return c;
   }
 
+  const BODY_SHAPE_DEPTH = { redondo:1, alargado:.78, compacto:1.12, esbelto:.62, macizo:1.25, ovalado:.85, anguloso:1, triangular:1 };
   function build3DBody(pal, bodyShape){
     // construyo el cuerpo apilando "lonchas" de cubos, igual que en 2D relleno fila a fila —
-    // así se nota que es la misma mascota, no una figura suave sin relación con el pixel art
+    // así se nota que es la misma mascota, no una figura suave sin relación con el pixel art.
+    // le sumo una barriguita clara y bracitos/piecitos cortos, para que tenga la silueta de
+    // criatura chibi de tus referencias, no un blob liso sin ninguna forma reconocible
     const group = new THREE.Group();
     const profileMap = {
       redondo:['round',1,1,1], alargado:['round',.78,1.32,.78], compacto:['round',1.22,.8,1.12],
@@ -3845,6 +3907,21 @@ body{padding:0;align-items:stretch;}
       box.position.y = yNorm*sy;
       group.add(box);
     }
+    // barriguita clara, pegada al frente, como en los chibis de referencia (cerdito, pajarito...)
+    const bellyMat = new THREE.MeshStandardMaterial({ color: pal.belly, roughness:.75, flatShading:true });
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(.62*sx,.7*sy,.32*sz), bellyMat);
+    belly.position.set(0,-sy*.18,.68*sz);
+    group.add(belly);
+    // bracitos cortos a los lados y piecitos debajo, para que no se quede en un blob sin extremidades
+    [-1,1].forEach(s=>{
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(.14*sx,.32*sy,.16*sz), mat);
+      arm.position.set(s*.82*sx,-.05*sy,.15*sz);
+      arm.rotation.z = s*-.35;
+      group.add(arm);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(.24*sx,.16*sy,.3*sz), mat);
+      foot.position.set(s*.32*sx,-1.02*sy,.28*sz);
+      group.add(foot);
+    });
     return group;
   }
 
@@ -3857,9 +3934,9 @@ body{padding:0;align-items:stretch;}
     function cyl(r1,r2,h){ return new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,4), mat); }
     if(featureType==='alas'){
       [-1,1].forEach(side=>{
-        const wing = box(.08, ry*1.1, rx*1.0);
-        wing.position.set(side*rx*.72, ry*.15, 0);
-        wing.rotation.z = side*0.35;
+        const wing = box(.07, ry*.85, rx*.8);
+        wing.position.set(side*rx*.78, -ry*.08, -rx*.12);
+        wing.rotation.z = side*0.4;
         g.add(wing);
       });
     } else if(featureType==='cuernos'){
@@ -3932,7 +4009,7 @@ body{padding:0;align-items:stretch;}
     const g = new THREE.Group();
     const mouthMat = new THREE.MeshStandardMaterial({ color:0x5a2530, roughness:.45, flatShading:true });
     const blushMat = new THREE.MeshBasicMaterial({ color:0xff9ec4, transparent:true, opacity:.55*(1-maturity*.75) });
-    const ez = rx*.9;
+    const ez = rx*.82;
     const mouthScale = 1 - maturity*.22;
     // boca de 5 tramos pegados entre sí, para que se lea como una curva continua y no como rayitas sueltas
     const segW = rx*.075*mouthScale;
@@ -3947,7 +4024,7 @@ body{padding:0;align-items:stretch;}
     }
     // una naricita pequeña entre los ojos y la boca, para que la cara se lea bien y no haya dudas de qué es qué
     const nose = new THREE.Mesh(new THREE.BoxGeometry(rx*.055,ry*.045,.045), mouthMat);
-    nose.position.set(0, ry*.02, ez*1.01);
+    nose.position.set(0, ry*.02, ez*1.03);
     g.add(nose);
     // cejas: de cría, finas y altas (dulces); de adulta, algo más gruesas y bajas (seria)
     [-1,1].forEach(s=>{
@@ -3973,15 +4050,17 @@ body{padding:0;align-items:stretch;}
   function build3DEyes(eyeStyle, rx, ry, sleeping, maturity, archetype){
     maturity = maturity||0;
     archetype = archetype||'criatura';
-    // ojos grandes y redondeados con un brillo blanco arriba — el toque kawaii — en vez de las cajas
-    // planas y angulosas de antes, que se veían frías y poco expresivas. Además, cada arquetipo tiene
-    // su propia forma de ojo — no le queda bien lo mismo a un robot que a una fiera o a un bicho
+    // de cría, la bola kawaii con brillo doble que ya teníamos. De ahí en adelante (todo lo que no sea
+    // infantil), un ojo rasgado con la esquina en punta y una línea de párpado marcada, como en las
+    // hojas de referencia de ojos anime — no es solo "la misma bola pero más pequeña"
     const g = new THREE.Group();
     const dark = new THREE.MeshStandardMaterial({ color:0x1a1a2a, roughness:.35, flatShading:true });
     const glow = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x66ffcc, emissiveIntensity:.8, flatShading:true });
     const sparkleMat = new THREE.MeshBasicMaterial({ color:0xffffff });
     const slitMat = new THREE.MeshBasicMaterial({ color:0x0a0a0a });
+    const lidMat = new THREE.MeshBasicMaterial({ color:0x0a0a0a });
     function tagEye(mesh){ mesh.userData.isEye = true; mesh.userData.baseScale = mesh.scale.clone(); return mesh; }
+    const isBaby = maturity < .32;
     function kawaiiEye(size, mat, addSparkle){
       const grp = new THREE.Group();
       const ball = new THREE.Mesh(new THREE.SphereGeometry(size, 9, 8), mat);
@@ -3998,13 +4077,11 @@ body{padding:0;align-items:stretch;}
       }
       grp.add(ball);
       if(archetype==='fantasia'){
-        // pupila rasgada vertical, en vez del brillo redondo — le da el aire de dragón/reptil
         const slit = new THREE.Mesh(new THREE.BoxGeometry(size*.22, size*1.3, size*.1), slitMat);
         slit.position.set(0,0,size*.42);
         grp.add(slit);
         if(addSparkle){ const sp = new THREE.Mesh(new THREE.SphereGeometry(size*.16,5,5), sparkleMat); sp.position.set(size*.22, size*.32, size*.4); grp.add(sp); }
       } else if(archetype==='bestia'){
-        // una pupila ovalada oscura y un solo brillo pequeño — más fiera, menos tierna
         const pupil = new THREE.Mesh(new THREE.SphereGeometry(size*.5,6,6), slitMat);
         pupil.scale.set(.7,1,.6); pupil.position.set(0,0,size*.28);
         grp.add(pupil);
@@ -4013,35 +4090,72 @@ body{padding:0;align-items:stretch;}
         const sp1 = new THREE.Mesh(new THREE.SphereGeometry(size*(archetype==='bicho'?.28:.34),6,6), sparkleMat);
         sp1.position.set(size*.32, size*.4, size*.32);
         grp.add(sp1);
-        if(maturity < .7 && archetype!=='humanoide'){
-          // el segundo brillo, más pequeño, solo se lo dejo a las crías — de adulta ya no destella tanto
-          const sp2 = new THREE.Mesh(new THREE.SphereGeometry(size*.17,5,5), sparkleMat);
-          sp2.position.set(-size*.18, -size*.12, size*.34);
-          grp.add(sp2);
-        }
+        const sp2 = new THREE.Mesh(new THREE.SphereGeometry(size*.17,5,5), sparkleMat);
+        sp2.position.set(-size*.18, -size*.12, size*.34);
+        grp.add(sp2);
       }
       return grp;
     }
-    const eyeMul = 1 - maturity*.34; // de adulta, los ojos se ven proporcionalmente más pequeños — menos "bebé"
-    const ez = rx*.88, ey = ry*.15;
+    function animeEye(size, mat){
+      // ojo rasgado tipo anime: forma alargada, punta afilada en la esquina exterior, y una línea
+      // de párpado gruesa y oscura por encima — el estilo "serio" que pediste para todo lo que no
+      // sea una cría
+      const grp = new THREE.Group();
+      let sx=1.4, sy=.76, sz=.4, tilt=.1;
+      if(archetype==='bestia'){ sx=1.5; sy=.62; sz=.42; tilt=.22; }
+      else if(archetype==='fantasia'){ sx=1.35; sy=.58; sz=.4; tilt=.28; }
+      else if(archetype==='bicho'){ sx=1.15; sy=.95; sz=.55; tilt=.05; }
+      else if(archetype==='humanoide'){ sx=1.25; sy=.68; sz=.36; tilt=.06; }
+      const lens = new THREE.Mesh(new THREE.SphereGeometry(size,8,6), mat);
+      lens.scale.set(sx,sy,sz);
+      grp.add(lens);
+      // punta afilada en la esquina exterior — el "rasgado" característico
+      const corner = new THREE.Mesh(new THREE.ConeGeometry(size*.42,size*.5,3), mat);
+      corner.rotation.z = -Math.PI/2;
+      corner.scale.set(.8,1,sz/.4);
+      corner.position.set(size*sx*.92, size*sy*.15, 0);
+      grp.add(corner);
+      // línea de párpado: un trazo oscuro y grueso justo encima del ojo, inclinado como en las referencias
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(size*(sx*2+.5), size*.22, size*.16), lidMat);
+      lid.position.set(-size*.08, size*sy*.85, size*sz*.55);
+      lid.rotation.z = tilt;
+      grp.add(lid);
+      if(archetype==='fantasia'){
+        const slit = new THREE.Mesh(new THREE.BoxGeometry(size*.16, size*.9, size*.08), slitMat);
+        slit.position.set(0,0,size*sz*.85);
+        grp.add(slit);
+      } else if(archetype==='bestia'){
+        const pupil = new THREE.Mesh(new THREE.SphereGeometry(size*.4,6,6), slitMat);
+        pupil.scale.set(.65,1,.5); pupil.position.set(0,0,size*sz*.7);
+        grp.add(pupil);
+      }
+      // un solo brillo, pequeño y anguloso — nada del doble destello de cría
+      const sp = new THREE.Mesh(new THREE.SphereGeometry(size*.16,5,5), sparkleMat);
+      sp.position.set(size*.18, -size*.1, size*sz*.9);
+      grp.add(sp);
+      return grp;
+    }
+    function eyeShape(size, mat, addSparkle){ return isBaby ? kawaiiEye(size, mat, addSparkle) : animeEye(size, mat); }
+    const eyeMul = isBaby ? 1 : (1 - Math.min(maturity,1)*.22); // ya no encojo tanto — el cambio real ahora es de forma, no solo de tamaño
+    const ez = rx*.82, ey = ry*.15;
     if(sleeping){
       [-1,1].forEach(s=>{ const e=tagEye(new THREE.Mesh(new THREE.BoxGeometry(rx*.26,.05,.05), dark)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
       return g;
     }
     if(eyeStyle==='ciclope'){
-      const e = tagEye(kawaiiEye(rx*.26*eyeMul, dark, true)); e.position.set(0, ey, ez); g.add(e);
+      const e = tagEye(eyeShape(rx*.26*eyeMul, dark, true)); e.position.set(0, ey, ez); g.add(e);
     } else if(eyeStyle==='trio'){
-      [-1,1].forEach(s=>{ const e=tagEye(kawaiiEye(rx*.16*eyeMul,dark,true)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+      [-1,1].forEach(s=>{ const e=tagEye(eyeShape(rx*.16*eyeMul,dark,true)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
       // el tercer ojo va arriba, en la frente — así se lee claramente como un tercer ojo y no como nariz
-      const e3 = tagEye(kawaiiEye(rx*.13*eyeMul,dark,true)); e3.position.set(0, ey+ry*.4, ez*.92); g.add(e3);
+      const e3 = tagEye(eyeShape(rx*.13*eyeMul,dark,true)); e3.position.set(0, ey+ry*.4, ez*.92); g.add(e3);
     } else if(eyeStyle==='brillantes'){
-      [-1,1].forEach(s=>{ const e=tagEye(kawaiiEye(rx*.19*eyeMul, glow, true)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+      [-1,1].forEach(s=>{ const e=tagEye(eyeShape(rx*.19*eyeMul, glow, true)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
     } else if(eyeStyle==='dormidos'){
       [-1,1].forEach(s=>{ const e=tagEye(new THREE.Mesh(new THREE.BoxGeometry(rx*.24,.04,.04), dark)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
     } else if(eyeStyle==='rasgados'){
-      [-1,1].forEach(s=>{ const e=tagEye(kawaiiEye(rx*.16*eyeMul, dark, true)); e.scale.set(1,1.15,.6); e.userData.baseScale = e.scale.clone(); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+      [-1,1].forEach(s=>{ const e=tagEye(eyeShape(rx*.16*eyeMul, dark, true)); e.scale.set(1,1.15,.6); e.userData.baseScale = e.scale.clone(); e.position.set(s*rx*.32, ey, ez); g.add(e); });
     } else {
-      [-1,1].forEach(s=>{ const e=tagEye(kawaiiEye(rx*.2*eyeMul, dark, true)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
+      [-1,1].forEach(s=>{ const e=tagEye(eyeShape(rx*.2*eyeMul, dark, true)); e.position.set(s*rx*.32, ey, ez); g.add(e); });
     }
     return g;
   }
@@ -4079,6 +4193,14 @@ body{padding:0;align-items:stretch;}
       arm.position.set(side*.52, .28, 0);
       arm.rotation.z = side*-.12;
       g.add(arm);
+      // hombrera, mas oscura, marcando donde termina el brazo y empieza el torso
+      const pauldron = new THREE.Mesh(new THREE.BoxGeometry(.28,.16,.3), hairMat);
+      pauldron.position.set(side*.5,.68,0);
+      g.add(pauldron);
+      // guante en la mano, mismo tono que las botas
+      const glove = new THREE.Mesh(new THREE.BoxGeometry(.24,.2,.26), hairMat);
+      glove.position.set(side*.56,-.16,0);
+      g.add(glove);
       const leg = new THREE.Mesh(new THREE.BoxGeometry(.26,.85,.28), mat);
       leg.position.set(side*.24, -.68, 0);
       g.add(leg);
@@ -4087,26 +4209,49 @@ body{padding:0;align-items:stretch;}
       boot.position.set(side*.24, -1.06, .03);
       g.add(boot);
     });
+    // cinturon marcando la cintura, y un pequeño emblema en el centro del peto
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(.7,.1,.42), hairMat);
+    belt.position.set(0,-.14,.28);
+    g.add(belt);
+    const emblem = new THREE.Mesh(new THREE.BoxGeometry(.14,.14,.04), new THREE.MeshStandardMaterial({color:pal.accent, roughness:.4, metalness:.3, flatShading:true}));
+    emblem.position.set(0,.42,.34);
+    g.add(emblem);
     return { group:g, headAnchor:{y:1.05, rx:.55, ry:.5, z:0} };
   }
   function build3DBeast(pal){
-    // torso horizontal a cuatro patas, con cabeza al frente y cola detrás — le añado melena en el lomo,
-    // orejas con mechón, y una borla en la cola, para que de un vistazo se note que es un animal de pelo,
-    // no solo una caja con patas
+    // torso horizontal a cuatro patas — ahora con careta clara en el hocico (como en las referencias de
+    // lobo), hocico que sobresale de verdad, garras individuales en cada pata, y una marca de "silla"
+    // más oscura en el lomo — antes era una caja lisa sin ninguna de estas marcas de verdad
     const g = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.8, flatShading:true, map: makeSkinTexture('pelo') });
     const furMat = new THREE.MeshStandardMaterial({ color: pal.dark, roughness:.9, flatShading:true });
+    const maskMat = new THREE.MeshStandardMaterial({ color: pal.belly, roughness:.75, flatShading:true, map: makeSkinTexture('pelo') });
+    const clawMat = new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness:.4, flatShading:true });
     const torso = new THREE.Mesh(new THREE.BoxGeometry(.8,.72,1.5), mat);
     torso.position.y = -.05;
     g.add(torso);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(.6,.56,.6), mat);
-    head.position.set(0, .12, .95);
+    // marca de "silla" más oscura sobre el lomo, pegada al cuerpo, no flotando
+    const saddle = new THREE.Mesh(new THREE.BoxGeometry(.62,.1,1.2), furMat);
+    saddle.position.set(0,.32,-.05);
+    g.add(saddle);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.6,.56,.55), mat);
+    head.position.set(0, .12, .92);
     g.add(head);
-    // orejas puntiagudas con un mechón de pelo en la punta
+    // hocico: sobresale de verdad al frente de la cabeza, con la careta clara característica
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(.4,.34,.32), maskMat);
+    muzzle.position.set(0,-.08,1.28);
+    g.add(muzzle);
+    const noseTip = new THREE.Mesh(new THREE.BoxGeometry(.13,.1,.06), new THREE.MeshStandardMaterial({color:0x1a1210, flatShading:true}));
+    noseTip.position.set(0,-.02,1.45);
+    g.add(noseTip);
+    // orejas puntiagudas con un mechón en la punta y el interior más claro
     [-1,1].forEach(s=>{
       const ear = new THREE.Mesh(new THREE.ConeGeometry(.09,.22,5), mat);
       ear.position.set(s*.22, .48, .95);
       g.add(ear);
+      const earInner = new THREE.Mesh(new THREE.ConeGeometry(.05,.14,5), maskMat);
+      earInner.position.set(s*.22, .43, 1.0);
+      g.add(earInner);
       const tuft = new THREE.Mesh(new THREE.ConeGeometry(.05,.1,4), furMat);
       tuft.position.set(s*.22, .6, .95);
       g.add(tuft);
@@ -4118,18 +4263,28 @@ body{padding:0;align-items:stretch;}
       tuft.rotation.x = -.3;
       g.add(tuft);
     }
-    // pelaje corto sugerido en el pecho, un poco más claro
-    const chestFur = new THREE.Mesh(new THREE.BoxGeometry(.5,.4,.15), new THREE.MeshStandardMaterial({color:pal.belly, roughness:.9, flatShading:true}));
+    // pelaje del pecho, mas claro, a juego con la careta del hocico
+    const chestFur = new THREE.Mesh(new THREE.BoxGeometry(.5,.4,.15), maskMat);
     chestFur.position.set(0,-.15,1.15);
     g.add(chestFur);
     [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{
       const leg = new THREE.Mesh(new THREE.BoxGeometry(.22,.62,.22), mat);
       leg.position.set(sx*.32, -.66, sz*.5);
       g.add(leg);
-      // una pata con "calcetín" de pelo mas oscuro, como muchos animales de verdad
+      // "calcetín" de pelo mas oscuro en la pata
       const paw = new THREE.Mesh(new THREE.BoxGeometry(.24,.14,.24), furMat);
       paw.position.set(sx*.32, -.94, sz*.5);
       g.add(paw);
+      // dedos y garras individuales, en vez de una pata lisa de un solo bloque
+      for(let t=-1;t<=1;t++){
+        const toe = new THREE.Mesh(new THREE.BoxGeometry(.06,.05,.09), furMat);
+        toe.position.set(sx*.32+t*.07, -1.01, sz*.5+.11);
+        g.add(toe);
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(.025,.06,4), clawMat);
+        claw.position.set(sx*.32+t*.07, -1.03, sz*.5+.16);
+        claw.rotation.x = Math.PI/2.2;
+        g.add(claw);
+      }
     });
     const tail = new THREE.Mesh(new THREE.CylinderGeometry(.1,.2,.9,5), mat);
     tail.position.set(0,.05,-.95);
@@ -4142,58 +4297,217 @@ body{padding:0;align-items:stretch;}
     return { group:g, headAnchor:{y:.12, rx:.5, ry:.45, z:.95} };
   }
   function build3DFantasy(pal){
-    // cuerpo serpenteante y alargado, con alas grandes y cola larga — le añado púas en el lomo y en la
-    // cola, más nervaduras en las alas, para que se lea como dragón/criatura mítica y no una serpiente lisa
+    // dragón de verdad: un torso grande y compacto, cuello fino que se curva hacia la cabeza por
+    // separado (no un cuerpo que se va estrechando poco a poco), alas grandes anclas arriba del lomo,
+    // y patas en dos tramos con garras — calcado de la anatomía de dragón de las referencias, no una
+    // serpiente con alas pegadas encima
     const g = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.75, flatShading:true, map: makeSkinTexture('escama') });
     const spikeMat = new THREE.MeshStandardMaterial({ color: pal.dark, roughness:.6, flatShading:true });
-    for(let i=0;i<4;i++){
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(.5-i*.06,.5-i*.06,.5), mat);
-      seg.position.set(0, .1+i*.06, .5-i*.42);
-      g.add(seg);
-      // una púa en el lomo de cada segmento, mas alta en el cuello y mas baja hacia la cola
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(.06,.16-i*.02,4), spikeMat);
-      spike.position.set(0, .32+i*.06, .5-i*.42);
+    const bellyMat = new THREE.MeshStandardMaterial({ color: pal.belly, roughness:.6, flatShading:true });
+    const membraneMat = new THREE.MeshStandardMaterial({ color: pal.belly, roughness:.5, flatShading:true, side:THREE.DoubleSide, transparent:true, opacity:.88 });
+    const clawMat = new THREE.MeshStandardMaterial({ color:0xf0ead8, roughness:.4, flatShading:true });
+    // torso: un bloque grande y compacto, no segmentos que se van estrechando
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(.85,.62,.95), mat);
+    torso.position.set(0,.08,-.05);
+    g.add(torso);
+    const bellyTorso = new THREE.Mesh(new THREE.BoxGeometry(.5,.22,.85), bellyMat);
+    bellyTorso.position.set(0,-.18,-.05);
+    g.add(bellyTorso);
+    // púas a lo largo del lomo del torso
+    for(let i=0;i<3;i++){
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(.07,.18,4), spikeMat);
+      spike.position.set(0,.42,.28-i*.28);
       g.add(spike);
     }
-    const head = new THREE.Mesh(new THREE.BoxGeometry(.56,.5,.62), mat);
-    head.position.set(0, .35, 1.05);
-    g.add(head);
-    // un par de púas mas grandes justo detras de la cabeza, como cresta
+    // cuello: dos tramos finos que se curvan hacia arriba y adelante, separados del torso — así se
+    // lee como cuello de verdad, no como el cuerpo que sigue estrechándose
+    const neckBase = new THREE.Group();
+    neckBase.position.set(0,.28,.42);
+    neckBase.rotation.x = -.3;
+    const neck1 = new THREE.Mesh(new THREE.BoxGeometry(.36,.36,.4), mat);
+    neck1.position.set(0,0,.18);
+    neckBase.add(neck1);
+    const neckSpike1 = new THREE.Mesh(new THREE.ConeGeometry(.05,.14,4), spikeMat);
+    neckSpike1.position.set(0,.24,.18);
+    neckBase.add(neckSpike1);
+    g.add(neckBase);
+    const neckTip = new THREE.Group();
+    neckTip.position.set(0,.1,.32);
+    neckTip.rotation.x = -.22;
+    const neck2 = new THREE.Mesh(new THREE.BoxGeometry(.3,.3,.36), mat);
+    neck2.position.set(0,0,.16);
+    neckTip.add(neck2);
+    neckBase.add(neckTip);
+    // cabeza, al final del cuello, con hocico marcado y dientes
+    const head = new THREE.Group();
+    head.position.set(0,.05,.34);
+    const skull = new THREE.Mesh(new THREE.BoxGeometry(.32,.28,.3), mat);
+    head.add(skull);
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(.2,.16,.26), mat);
+    snout.position.set(0,-.06,.24);
+    head.add(snout);
+    const jaw = new THREE.Mesh(new THREE.BoxGeometry(.17,.06,.24), bellyMat);
+    jaw.position.set(0,-.14,.24);
+    head.add(jaw);
+    for(let t=-1;t<=1;t+=2){
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(.015,.05,3), clawMat);
+      tooth.position.set(t*.06,-.1,.35);
+      tooth.rotation.x = Math.PI;
+      head.add(tooth);
+    }
     [-1,1].forEach(s=>{
-      const crest = new THREE.Mesh(new THREE.ConeGeometry(.06,.22,4), spikeMat);
-      crest.position.set(s*.15, .62, .82);
-      crest.rotation.z = s*.3;
-      g.add(crest);
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4), spikeMat);
+      crest.position.set(s*.1,.16,.06);
+      crest.rotation.z = s*.35;
+      head.add(crest);
     });
+    neckTip.add(head);
+    // alas grandes, ancladas arriba del torso (como en las referencias, no a media espalda)
     [-1,1].forEach(side=>{
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(.08, .95, 1.15), mat);
-      wing.position.set(side*.75, .5, -.1);
-      wing.rotation.z = side*.4;
-      wing.rotation.y = side*.15;
-      g.add(wing);
-      // nervaduras del ala, lineas mas oscuras que sugieren la membrana tensada
+      const wingFrame = new THREE.Mesh(new THREE.BoxGeometry(.07,1.1,.18), spikeMat);
+      wingFrame.position.set(side*.48,.55,-.15);
+      wingFrame.rotation.z = side*.55;
+      wingFrame.rotation.y = side*.18;
+      g.add(wingFrame);
+      const wingMembrane = new THREE.Mesh(new THREE.PlaneGeometry(1.0,1.25), membraneMat);
+      wingMembrane.position.set(side*.52,.5,-.15);
+      wingMembrane.rotation.z = side*.55;
+      wingMembrane.rotation.y = side*(.18+1.5708);
+      g.add(wingMembrane);
       for(let r=0;r<3;r++){
-        const rib = new THREE.Mesh(new THREE.BoxGeometry(.02,.85-r*.18,.05), spikeMat);
-        rib.position.set(side*(.75+.03), .5-r*.05, -.1+.32-r*.28);
-        rib.rotation.z = side*.4;
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(.02,1.0-r*.2,.05), spikeMat);
+        rib.position.set(side*(.48+.03),.55-r*.06,-.15+.36-r*.32);
+        rib.rotation.z = side*.55;
         g.add(rib);
       }
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(.2,.5,.2), mat);
-      leg.position.set(side*.28, -.5, -.2);
-      g.add(leg);
     });
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(.06,.22,1.3,5), mat);
-    tail.position.set(0,.15,-1.35);
-    tail.rotation.x = Math.PI/2.2;
-    g.add(tail);
-    // hilera de pequeñas púas a lo largo de la cola
-    for(let i=0;i<4;i++){
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(.04,.12,4), spikeMat);
-      spike.position.set(0, .3+i*.13, -.85-i*.28);
-      g.add(spike);
+    // patas en dos tramos (muslo + espinilla), con garras — en vez de una sola caja recta por pata
+    [[-1,-1,'front'],[1,-1,'front'],[-1,1,'back'],[1,1,'back']].forEach(([sx,sz])=>{
+      const legX = sx*.42, legZ = sz<0 ? .28 : -.35;
+      const thigh = new THREE.Mesh(new THREE.BoxGeometry(.2,.32,.22), mat);
+      thigh.position.set(legX,-.28,legZ);
+      g.add(thigh);
+      const shin = new THREE.Mesh(new THREE.BoxGeometry(.16,.3,.18), mat);
+      shin.position.set(legX,-.56,legZ+.03);
+      g.add(shin);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(.19,.1,.24), spikeMat);
+      foot.position.set(legX,-.73,legZ+.08);
+      g.add(foot);
+      for(let t=-1;t<=1;t++){
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(.028,.09,4), clawMat);
+        claw.position.set(legX+t*.055,-.76,legZ+.19);
+        claw.rotation.x = Math.PI/2.3;
+        g.add(claw);
+      }
+    });
+    // cola larga, con púas, saliendo de la parte de atrás del torso
+    const tailBase = new THREE.Group();
+    tailBase.position.set(0,.02,-.5);
+    tailBase.rotation.x = .35;
+    const tailSeg1 = new THREE.Mesh(new THREE.CylinderGeometry(.16,.25,.75,6), mat);
+    tailSeg1.position.set(0,0,-.38);
+    tailSeg1.rotation.x = Math.PI/2;
+    tailBase.add(tailSeg1);
+    g.add(tailBase);
+    const tailTip = new THREE.Group();
+    tailTip.position.set(0,0,-.75);
+    tailTip.rotation.x = .5; // la segunda mitad se curva mas, para que la cola se levante del suelo y se vea bien
+    tailBase.add(tailTip);
+    const tailSeg2 = new THREE.Mesh(new THREE.CylinderGeometry(.03,.16,.7,6), mat);
+    tailSeg2.position.set(0,0,-.35);
+    tailSeg2.rotation.x = Math.PI/2;
+    tailTip.add(tailSeg2);
+    // púas a lo largo de toda la cola, siguiendo la curva de los dos tramos
+    for(let i=0;i<3;i++){
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(.05,.13,4), spikeMat);
+      spike.position.set(0,.16,-.2-i*.24);
+      tailBase.add(spike);
     }
-    return { group:g, headAnchor:{y:.35, rx:.5, ry:.42, z:1.05} };
+    for(let i=0;i<3;i++){
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(.035,.1,4), spikeMat);
+      spike.position.set(0,.13,-.15-i*.2);
+      tailTip.add(spike);
+    }
+    return { group:g, headAnchor:{y:.68, rx:.28, ry:.24, z:.97} };
+  }
+  function build3DOrientalDragon(pal){
+    // dragón oriental: cuerpo largo y serpenteante en una curva suave, sin alas, con melena de
+    // púas en el cuello y bigotes largos — muy distinto del dragón occidental de cuatro patas robustas
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: pal.body, roughness:.7, flatShading:true, map: makeSkinTexture('escama') });
+    const maneMat = new THREE.MeshStandardMaterial({ color: pal.dark, roughness:.6, flatShading:true });
+    const bellyMat = new THREE.MeshStandardMaterial({ color: pal.belly, roughness:.6, flatShading:true });
+    const clawMat = new THREE.MeshStandardMaterial({ color:0xf0ead8, roughness:.4, flatShading:true });
+    const segCount = 7;
+    const positions = [];
+    for(let i=0;i<segCount;i++){
+      const t = i/(segCount-1);
+      positions.push({
+        x: Math.sin(t*Math.PI*1.25)*.48,
+        y: .08 + Math.sin(t*Math.PI*.55)*.16,
+        z: .85 - t*1.85,
+        t
+      });
+    }
+    positions.forEach((p,i)=>{
+      const radius = .27 - p.t*.15;
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(radius,7,6), mat);
+      seg.scale.set(1,.85,1.3);
+      seg.position.set(p.x,p.y,p.z);
+      g.add(seg);
+      const bellySeg = new THREE.Mesh(new THREE.BoxGeometry(radius*1.1,radius*.5,radius*1.6), bellyMat);
+      bellySeg.position.set(p.x,p.y-radius*.75,p.z);
+      g.add(bellySeg);
+      if(i>0){
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(radius*.4,radius*1.1,4), maneMat);
+        spike.position.set(p.x,p.y+radius*.85,p.z);
+        g.add(spike);
+      }
+      // patas pequeñas y finas cada dos segmentos, con garras — un dragón oriental apenas se apoya en ellas
+      if(i%2===1 && i<segCount-1){
+        [-1,1].forEach(side=>{
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(.05,.06,.3,4), mat);
+          leg.position.set(p.x+side*radius*.95,p.y-.24,p.z);
+          g.add(leg);
+          for(let c=-1;c<=1;c++){
+            const claw = new THREE.Mesh(new THREE.ConeGeometry(.02,.06,3), clawMat);
+            claw.position.set(p.x+side*radius*.95+c*.035,p.y-.39,p.z+.06);
+            claw.rotation.x = Math.PI/2.3;
+            g.add(claw);
+          }
+        });
+      }
+    });
+    // cabeza al frente del primer segmento (el mas ancho)
+    const hp = positions[0];
+    const head = new THREE.Group();
+    head.position.set(hp.x, hp.y+.05, hp.z+.32);
+    const skull = new THREE.Mesh(new THREE.BoxGeometry(.34,.28,.32), mat);
+    head.add(skull);
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(.2,.16,.22), mat);
+    snout.position.set(0,-.05,.24);
+    head.add(snout);
+    const jaw = new THREE.Mesh(new THREE.BoxGeometry(.17,.06,.2), bellyMat);
+    jaw.position.set(0,-.13,.22);
+    head.add(jaw);
+    // melena de púas sobre la cabeza y el arranque del cuello
+    for(let i=0;i<3;i++){
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(.045,.16,4), maneMat);
+      spike.position.set(0,.16+i*.01,-.02-i*.11);
+      spike.rotation.x = -.3;
+      head.add(spike);
+    }
+    // bigotes largos y finos, el rasgo distintivo del dragón oriental
+    [-1,1].forEach(s=>{
+      const whisker = new THREE.Mesh(new THREE.CylinderGeometry(.012,.02,.5,4), maneMat);
+      whisker.position.set(s*.12,-.08,.42);
+      whisker.rotation.z = s*.5;
+      whisker.rotation.x = .3;
+      head.add(whisker);
+    });
+    g.add(head);
+    return { group:g, headAnchor:{y:hp.y+.05, rx:.3, ry:.26, z:hp.z+.44} };
   }
   function build3DBug(pal){
     // cuerpo de insecto en tres partes (cabeza, tórax, abdomen), seis patas articuladas y antenas —
@@ -4211,6 +4525,19 @@ body{padding:0;align-items:stretch;}
     abdomen.scale.set(1,.82,1.5);
     abdomen.position.set(0,0,-.32);
     g.add(abdomen);
+    // bandas del caparazón marcando los segmentos del abdomen, como en un escarabajo de verdad
+    const bandMat = new THREE.MeshStandardMaterial({ color: pal.dark, roughness:.25, metalness:.25, flatShading:true });
+    for(let i=0;i<3;i++){
+      const band = new THREE.Mesh(new THREE.TorusGeometry(.4-i*.04,.018,5,10), bandMat);
+      band.rotation.y = Math.PI/2;
+      band.position.set(0,0,-.05-i*.28);
+      band.scale.set(1,.82,1);
+      g.add(band);
+    }
+    // linea central del caparazón, como la separación de las élitros de un escarabajo
+    const midline = new THREE.Mesh(new THREE.BoxGeometry(.02,.06,1.1), bandMat);
+    midline.position.set(0,.32,-.35);
+    g.add(midline);
     // seis patas finas y anguladas, en tres pares a lo largo del cuerpo
     for(let i=0;i<3;i++){
       const zPos = .55-i*.35;
@@ -4258,7 +4585,9 @@ body{padding:0;align-items:stretch;}
     } else if(archetype==='bestia'){
       const r = build3DBeast(pal); group.add(r.group); headAnchor = r.headAnchor;
     } else if(archetype==='fantasia'){
-      const r = build3DFantasy(pal); group.add(r.group); headAnchor = r.headAnchor;
+      // cuerpo esbelto o alargado = dragón oriental (sin alas, serpenteante); el resto = dragón occidental de cuatro patas
+      const r = (traits.bodyShape==='esbelto' || traits.bodyShape==='alargado') ? build3DOrientalDragon(pal) : build3DFantasy(pal);
+      group.add(r.group); headAnchor = r.headAnchor;
     } else if(archetype==='bicho'){
       const r = build3DBug(pal); group.add(r.group); headAnchor = r.headAnchor;
     } else {
@@ -4277,6 +4606,7 @@ body{padding:0;align-items:stretch;}
     const feat = build3DFeature(pal, traits.featureType||'alas', headAnchor.rx, headAnchor.ry);
     const isBackFeature = (traits.featureType==='alas' || traits.featureType==='aletas');
     const skipFeature = (archetype==='fantasia' && traits.featureType==='alas'); // la fantasía ya trae sus propias alas de dragón — no le sumo un segundo par
+    const criaturaDepth = BODY_SHAPE_DEPTH[traits.bodyShape] || 1; // cada forma de criatura es mas o menos profunda — sin esto, los ojos quedaban hundidos en formas anchas como "macizo"
     if(skipFeature){
       // no añado nada — evito el par de alas genérico duplicado sobre el que ya trae el cuerpo
     } else if(isBackFeature && archetype==='bestia'){
@@ -4290,25 +4620,25 @@ body{padding:0;align-items:stretch;}
       group.add(feat);
     } else {
       feat.position.y += headAnchor.y;
-      feat.position.z += (archetype==='criatura') ? (headAnchor.z - .88) : headAnchor.z;
+      feat.position.z += (archetype==='criatura') ? (headAnchor.z*criaturaDepth - .88) : headAnchor.z;
       group.add(feat);
     }
     const maturity = Math.max(0, Math.min(1, ((traits.stage!=null?traits.stage:3)-1)/4)); // 0 = cría recién nacida, 1 = forma Suprema
     const eyes = build3DEyes(traits.eyeStyle||'redondos', headAnchor.rx, headAnchor.ry, !!traits.sleeping, maturity, archetype);
     eyes.position.y += headAnchor.y;
-    eyes.position.z += (archetype==='criatura') ? (headAnchor.z - .88) : headAnchor.z;
+    eyes.position.z += (archetype==='criatura') ? (headAnchor.z*criaturaDepth - .88 + .1*(criaturaDepth-1)) : headAnchor.z;
     group.add(eyes);
     if(!traits.sleeping){
       const face = build3DFace(headAnchor.rx, headAnchor.ry, maturity);
       face.position.y += headAnchor.y;
-      face.position.z += (archetype==='criatura') ? (headAnchor.z - .88) : headAnchor.z;
+      face.position.z += (archetype==='criatura') ? (headAnchor.z*criaturaDepth - .88 + .1*(criaturaDepth-1)) : headAnchor.z;
       group.add(face);
     }
     // manchas y rayas: cada arquetipo tiene un cuerpo con una forma y un tamaño muy distintos, así que
     // coloco los adornos según la silueta real de cada uno — antes usaba una sola posición fija pensada
     // solo para el cuerpo redondo de la criatura, y en el resto de formas quedaban flotando en el aire
     const spotBounds = {
-      criatura: {x:1.2, y:.8, z:[.7,.9]},
+      criatura: {x:1.2, y:.8, z:[.62,.8]},
       humanoide:{x:.5, y:[-.15,.75], z:[.24,.3]},
       bestia:   {x:.55, y:[-.35,.15], z:[-.6,.6]},
       fantasia: {x:.4, y:[-.1,.5], z:[-1.1,.6]},
