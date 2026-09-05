@@ -1302,7 +1302,6 @@ body{padding:0;align-items:stretch;}
   }
 
   function palette(stage, hue){
-    if(stage<=2){ return {body:'#8fe3a0', belly:'#eafff0', dark:'#4fae6c', accent:'#c8ffd6'}; }
     const h = hue||0;
     return {
       body:  `hsl(${h}, 68%, 62%)`,
@@ -1376,15 +1375,23 @@ body{padding:0;align-items:stretch;}
     const cx=cxOverride!=null?cxOverride:12, cy=cyOverride!=null?cyOverride:(transparent ? 13.5 : (canvas.height/cell)/2);
     const sizes = {1:[4.6,4.2],2:[5.6,5.0],3:[6.8,6.2],4:[7.8,7.2],5:[8.8,8.2]};
     let [rx,ry] = sizes[stage];
-    if(stage>=3){
+    if(stage>=1){
       const shape = pet.bodyShape||'redondo';
-      if(shape==='anguloso'){ rx*=0.92; ry*=1.08; }
-      else if(shape==='alargado'){ rx*=0.8; ry*=1.28; }
-      else if(shape==='compacto'){ rx*=1.18; ry*=0.82; }
-      else if(shape==='esbelto'){ rx*=0.7; ry*=1.4; }
-      else if(shape==='macizo'){ rx*=1.32; ry*=0.72; }
-      else if(shape==='ovalado'){ rx*=0.88; ry*=1.16; }
-      else if(shape==='triangular'){ rx*=1.05; ry*=0.95; }
+      const archForShape = stage>=3 ? (pet.archetype || 'criatura') : 'criatura';
+      // las siluetas propias (bestia/humanoide/fantasía/bicho) ya tienen sus proporciones ajustadas a mano —
+      // si les aplico el mismo estirón que a la criatura, las patas/brazos/cola se quedan fuera del cuerpo.
+      // De cría, esto ya se nota desde el primer día — antes solo cambiaba el color, y todas parecían iguales
+      const dampen = archForShape==='criatura' ? (stage>=3?1:0.75) : 0.35;
+      let mx=1, my=1;
+      if(shape==='anguloso'){ mx=0.92; my=1.08; }
+      else if(shape==='alargado'){ mx=0.8; my=1.28; }
+      else if(shape==='compacto'){ mx=1.18; my=0.82; }
+      else if(shape==='esbelto'){ mx=0.7; my=1.4; }
+      else if(shape==='macizo'){ mx=1.32; my=0.72; }
+      else if(shape==='ovalado'){ mx=0.88; my=1.16; }
+      else if(shape==='triangular'){ mx=1.05; my=0.95; }
+      rx *= 1 + (mx-1)*dampen;
+      ry *= 1 + (my-1)*dampen;
     }
     const pal = palette(stage, pet.hue);
     const bob = (frame%8<4)?0:0.4;
@@ -1415,17 +1422,37 @@ body{padding:0;align-items:stretch;}
     // el cuerpo: cada arquetipo tiene su propia silueta a partir de la evolución grande — antes
     // todos usaban el mismo óvalo genérico, ahora bestia/humanoide/fantasía/bicho se ven distintos de verdad
     const archetype = stage>=3 ? (pet.archetype||'criatura') : 'criatura';
-    let head = { headCx:cx, headCy:bcy-ry*0.12, headR:Math.min(rx,ry)*0.55 };
-    if(archetype==='bestia') head = drawBodyBestia(cx,bcy,rx,ry,pal);
-    else if(archetype==='humanoide') head = drawBodyHumanoide(cx,bcy,rx,ry,pal);
-    else if(archetype==='fantasia') head = drawBodyFantasy(cx,bcy,rx,ry,pal);
-    else if(archetype==='bicho') head = drawBodyBicho(cx,bcy,rx,ry,pal);
-    else {
-      ellipseCells(cx,bcy,rx,ry).forEach(([gx,gy])=>px(gx,gy,pal.body));
-      ellipseCells(cx,bcy+ry*0.28,rx*0.62,ry*0.5).forEach(([gx,gy])=>px(gx,gy,pal.belly));
-    }
+    const bodyDrawFn = (usePal) => {
+      if(archetype==='bestia') return drawBodyBestia(cx,bcy,rx,ry,usePal);
+      else if(archetype==='humanoide') return drawBodyHumanoide(cx,bcy,rx,ry,usePal);
+      else if(archetype==='fantasia') return drawBodyFantasy(cx,bcy,rx,ry,usePal);
+      else if(archetype==='bicho') return drawBodyBicho(cx,bcy,rx,ry,usePal);
+      ellipseCells(cx,bcy,rx,ry).forEach(([gx,gy])=>px(gx,gy,usePal.body));
+      ellipseCells(cx,bcy+ry*0.28,rx*0.62,ry*0.5).forEach(([gx,gy])=>px(gx,gy,usePal.belly));
+      return { headCx:cx, headCy:bcy-ry*0.12, headR:Math.min(rx,ry)*0.55 };
+    };
+    // contorno oscuro alrededor de toda la silueta — dibujo la figura 4 veces desplazada, con todos
+    // sus colores cambiados a negro sólido (nada de filtros de canvas, que son carísimos de repetir
+    // cada fotograma y llegaban a colgar el navegador), y encima la versión real a color. Esto es lo
+    // que hace que cualquier forma se lea como un personaje "acabado", no manchas de color sueltas
+    const outlineOff = Math.max(1, cell*0.1);
+    const blackPal = { body:'#120e0a', belly:'#120e0a', dark:'#120e0a', accent:'#120e0a' };
+    [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{
+      ctx.save();
+      ctx.translate(dx*outlineOff, dy*outlineOff);
+      bodyDrawFn(blackPal);
+      ctx.restore();
+    });
+    let head = bodyDrawFn(pal);
+    // sombreado sencillo por bloques, para dar volumen real sin salirme del estilo de pixel art —
+    // una sombra plana semitransparente en la mitad inferior-derecha, como en los sprites de verdad
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = pal.dark;
+    ctx.beginPath(); ctx.ellipse((cx+rx*0.18)*cell,(bcy+ry*0.32)*cell, rx*0.95*cell, ry*0.7*cell, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
     // el patrón propio de esta especie (liso, manchas, rayas o estrellado), desde Joven en adelante
-    if(stage>=3 && pet.pattern && pet.pattern!=='liso' && archetype==='criatura'){
+    if(stage>=1 && pet.pattern && pet.pattern!=='liso' && archetype==='criatura'){
       drawPattern(cx,bcy,rx,ry,pet.pattern,pal.dark);
     }
 
@@ -1452,12 +1479,11 @@ body{padding:0;align-items:stretch;}
     const fcx = head.headCx, fcy = head.headCy, fr = head.headR;
     const maturity = Math.max(0, Math.min(1, (stage-1)/4));
     const isBaby = maturity < .32;
-    const eyeStyle = stage>=3 ? (pet.eyeStyle||'redondos') : 'redondos';
+    const eyeStyle = pet.eyeStyle||'redondos';
     const eyeY = fcy - fr*0.08;
-    const eyeDX = eyeStyle==='ciclope' ? 0 : fr*0.6;
+    const eyeDX = fr*0.6;
     if(sleeping){
-      if(eyeStyle==='ciclope'){ px(fcx-0.8,eyeY,'#1a2620',1.6,0.5); }
-      else{ px(fcx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); px(fcx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); }
+      px(fcx-eyeDX-0.6,eyeY,'#1a2620',1.6,0.5); px(fcx+eyeDX-0.6,eyeY,'#1a2620',1.6,0.5);
       ctx.fillStyle='#dfeee6';
       ctx.font='700 22px monospace';
       ctx.fillText('Z', (cx+rx+1)*cell, (bcy-ry-2+((frame%16<8)?0:-1))*cell);
@@ -1467,51 +1493,97 @@ body{padding:0;align-items:stretch;}
       px(fcx-eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
       px(fcx+eyeDX-0.6,eyeY-0.6,'#1a2620',1.6,1.6);
       px(fcx+eyeDX-0.1,eyeY-0.1,pal.body,0.6,0.6);
-    } else {
+    } else if(pet.isMonster){
+      // cara de monstruo de verdad: todo lo contrario a la mascota — ojos afilados y brillantes, cejas
+      // fruncidas hacia dentro, y una mueca en vez de sonrisa. Si el cuerpo está de perfil (bestia,
+      // fantasía, bicho todos miran hacia un lado) solo dibujo un ojo, no dos superpuestos sin sentido
       const blink = frame%20>=18;
-      const eh = blink?0.4:1.5;
-      if(isBaby){
-        // cría: ojo kawaii redondo con un brillito, tal y como estaba
-        if(eyeStyle==='ciclope'){
-          px(fcx-1.1,eyeY+(2.2-eh)/2,'#1a2620',2.2,eh+0.7);
-          if(!blink) px(fcx-0.5,eyeY+0.3,'#ffffff',0.6,0.6);
-        } else if(eyeStyle==='rasgados'){
-          px(fcx-eyeDX-0.4,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
-          px(fcx+eyeDX-0.8,eyeY+(1.5-eh)/2,'#1a2620',1.1,eh);
-        } else if(eyeStyle==='trio'){
-          px(fcx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
-          px(fcx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.4,eh);
-          px(fcx-0.5,eyeY-fr*0.9,'#1a2620',1.0,eh*0.7); // el tercer ojo va arriba, en la frente, no como nariz
-        } else if(eyeStyle==='dormidos'){
-          px(fcx-eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
-          px(fcx+eyeDX-0.7,eyeY+0.5,'#1a2620',1.8,0.5);
-        } else if(eyeStyle==='brillantes'){
-          px(fcx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-          px(fcx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-          px(fcx-eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
-          px(fcx+eyeDX-0.2,eyeY+(1.5-eh)/2+0.1,pal.accent,0.6,0.6);
-        } else {
-          px(fcx-eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
-          px(fcx+eyeDX-0.6,eyeY+(1.5-eh)/2,'#1a2620',1.6,eh);
+      const isProfile = archetype==='bestia' || archetype==='fantasia' || archetype==='bicho';
+      const sides = isProfile ? [1] : [-1,1];
+      sides.forEach(side=>{
+        const exPx=(isProfile ? fcx+eyeDX*0.5 : fcx+side*eyeDX)*cell, eyPx=eyeY*cell;
+        if(blink){ ctx.strokeStyle='#3a0808'; ctx.lineWidth=cell*.2; ctx.beginPath(); ctx.moveTo(exPx-cell*.9,eyPx); ctx.lineTo(exPx+cell*.5,eyPx); ctx.stroke(); return; }
+        // el ojo: una hendidura afilada y estrecha, con un brillo encendido dentro
+        ctx.fillStyle = '#1a0505';
+        ctx.beginPath();
+        ctx.moveTo(exPx-cell*1.1, eyPx+cell*.15);
+        ctx.lineTo(exPx-cell*.1, eyPx-cell*.55);
+        ctx.lineTo(exPx+cell*.85, eyPx-cell*.05);
+        ctx.lineTo(exPx-cell*.1, eyPx+cell*.4);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal.accent;
+        ctx.beginPath(); ctx.ellipse(exPx-cell*.05, eyPx-cell*.05, cell*.4, cell*.22, -side*.3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#1a0505';
+        ctx.beginPath(); ctx.arc(exPx-cell*.05, eyPx-cell*.05, cell*.13, 0, Math.PI*2); ctx.fill();
+        // ceja gruesa, fruncida hacia el centro de la cara
+        ctx.strokeStyle = '#1a0505'; ctx.lineWidth = cell*.22; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(exPx-side*cell*.9, eyPx-cell*.95); ctx.lineTo(exPx+side*cell*.3, eyPx-cell*.5); ctx.stroke();
+      });
+      // boca: una mueca angulosa hacia abajo, con un par de colmillos asomando
+      ctx.strokeStyle = '#1a0505'; ctx.lineWidth = Math.max(1,cell*.16);
+      ctx.beginPath();
+      ctx.moveTo((fcx-1.1)*cell, (fcy+fr*0.55)*cell);
+      ctx.quadraticCurveTo(fcx*cell, (fcy+fr*0.95)*cell, (fcx+1.1)*cell, (fcy+fr*0.55)*cell);
+      ctx.stroke();
+      ctx.fillStyle = '#f0ead6';
+      ctx.beginPath(); ctx.moveTo((fcx-0.5)*cell,(fcy+fr*0.58)*cell); ctx.lineTo((fcx-0.28)*cell,(fcy+fr*0.58)*cell); ctx.lineTo((fcx-0.39)*cell,(fcy+fr*0.78)*cell); ctx.fill();
+      ctx.beginPath(); ctx.moveTo((fcx+0.28)*cell,(fcy+fr*0.58)*cell); ctx.lineTo((fcx+0.5)*cell,(fcy+fr*0.58)*cell); ctx.lineTo((fcx+0.39)*cell,(fcy+fr*0.78)*cell); ctx.fill();
+    } else {
+      // rostro pensado a mi gusto, ahora con el toque de pixel art de verdad que vi en las referencias:
+      // bloques sólidos y sencillos, un único pixel de brillo — nada de curvas suaves tipo vector, que
+      // es lo que hacía que los ojos no encajaran con el resto del estilo
+      const blink = frame%20>=18;
+      if(archetype==='bestia'){
+        // un solo ojo, de perfil — bloque ovalado sólido con un iris ambar y un único brillo, al
+        // estilo de un sprite de animal de verdad, no una ilustración suavizada
+        const ex = fcx+eyeDX*0.5;
+        if(blink){ px(ex-1.1,eyeY-0.12,'#1a120c',2.0,0.28); }
+        else {
+          px(ex-1.1,eyeY-0.75,'#1a120c',2.0,1.5);
+          px(ex-0.75,eyeY-0.45,'#e8a23a',1.35,0.95);
+          px(ex-0.35,eyeY-0.35,'#1a120c',0.65,0.75);
+          px(ex-0.1,eyeY-0.6,'#ffffff',0.32,0.32);
         }
-        if(!blink && eyeStyle!=='ciclope'){ px(fcx-eyeDX-0.2,eyeY+0.1,'#ffffff',0.5,0.5); px(fcx+eyeDX-0.2,eyeY+0.1,'#ffffff',0.5,0.5); }
+      } else if(archetype==='fantasia'){
+        // ojo de dragón, uno solo — el rombo alargado de bloques que ya funcionaba, pero con un solo
+        // brillo pequeño en vez del degradado suave de antes
+        const ex=fcx+eyeDX*0.5;
+        if(blink){ px(ex-1.6,eyeY-0.12,'#1a120c',3.0,0.3); }
+        else {
+          px(ex-1.6,eyeY-0.35,'#1a120c',0.7,0.7);
+          px(ex-0.95,eyeY-0.85,'#1a120c',2.0,1.7);
+          px(ex+1.05,eyeY-0.35,'#1a120c',0.7,0.7);
+          px(ex-0.75,eyeY-0.6,'#fff6e0',1.5,1.2);
+          px(ex-0.3,eyeY-0.35,'#1a120c',0.8,0.85);
+          px(ex-0.05,eyeY-0.65,'#ffffff',0.3,0.3);
+        }
+      } else if(archetype==='bicho'){
+        // un solo ojo, de perfil — un bloque redondeado sencillo, sin iris de color, con un brillo
+        const ex = fcx+eyeDX*0.5;
+        if(blink){ px(ex-1.0,eyeY-0.12,'#1a120c',1.9,0.28); }
+        else {
+          px(ex-1.0,eyeY-1.0,'#1a120c',1.9,1.9);
+          px(ex-0.6,eyeY-0.65,'#ffffff',0.35,0.35);
+        }
       } else {
-        // a partir de aquí, ojo rasgado con línea de párpado marcada — el estilo "serio" para todo lo
-        // que no sea cría, en vez de la misma bola kawaii encogida
+        // criatura y humanoide: dos ojos, bloque sólido ovalado con un solo brillo — el look cálido
+        // y sencillo de un sprite de verdad, sin el doble degradado de antes
         [-1,1].forEach(side=>{
-          if(eyeStyle==='ciclope' && side===-1) return;
-          const ex = eyeStyle==='ciclope' ? fcx : fcx+side*eyeDX;
-          px(ex-1.1,eyeY+(1.6-eh)/2,'#1a2620',1.7,eh);
-          px(ex+.55*side,eyeY+(1.6-eh)/2-.15,'#1a2620',.5,.5); // punta afilada en la esquina exterior
-          px(ex-1.15,eyeY-eh*.35,'#1a2620',2.0,.35); // línea de párpado, gruesa, por encima
-          if(!blink) px(ex-.3,eyeY+.1,'#ffffff',.4,.4);
+          const ex = fcx+side*eyeDX;
+          if(blink){ px(ex-0.85,eyeY-0.1,'#1a120c',1.7,0.25); return; }
+          px(ex-0.85,eyeY-1.0,'#1a120c',1.7,1.75);
+          px(ex-0.85+(side>0?0.85:0.15),eyeY-0.65,'#ffffff',0.4,0.4);
         });
       }
     }
 
-    // la boquita
-    if(!sleeping){
-      px(fcx-0.7,fcy+fr*0.65,'#1a2620',1.4,0.5);
+    // la boquita: una curva suave hacia arriba, cercana y amigable en vez de una rayita seca
+    if(!sleeping && !pet.isMonster){
+      ctx.strokeStyle = '#1a2620'; ctx.lineWidth = Math.max(1,cell*.14); ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo((fcx-1.1)*cell, (fcy+fr*0.6)*cell);
+      ctx.quadraticCurveTo(fcx*cell, (fcy+fr*0.6+cell*.28/cell)*cell, (fcx+0.9)*cell, (fcy+fr*0.58)*cell);
+      ctx.stroke();
     }
 
     // el detallito del temperamento, desde que es Pequeño
@@ -1528,76 +1600,130 @@ body{padding:0;align-items:stretch;}
   }
 
   function drawBodyBestia(cx,cy,rx,ry,pal){
+    const isAvian = pet_bodyShapeIsAvian(pal);
     const bodyRx=rx*1.05, bodyRy=ry*0.6;
-    // cola primero, para que quede detrás del cuerpo
-    px(cx-bodyRx*1.05,cy-bodyRy*0.35,pal.body,rx*0.22,ry*0.32);
-    px(cx-bodyRx*1.18,cy-bodyRy*0.75,pal.dark,rx*0.2,ry*0.28);
+    // cola primero, para que quede detrás del cuerpo — la acerco al cuerpo para que no quede flotando
+    px(cx-bodyRx*0.82,cy-bodyRy*0.35,pal.body,rx*0.24,ry*0.3);
+    px(cx-bodyRx*0.98,cy-bodyRy*0.7,pal.dark,rx*0.2,ry*0.26);
     ellipseCells(cx,cy,bodyRx,bodyRy).forEach(([gx,gy])=>px(gx,gy,pal.body));
     ellipseCells(cx,cy+bodyRy*0.35,bodyRx*0.68,bodyRy*0.55).forEach(([gx,gy])=>px(gx,gy,pal.belly));
     const headR=ry*0.56, headCx=cx+bodyRx*0.82, headCy=cy-bodyRy*0.2;
-    // orejas, detrás de la cabeza
-    px(headCx-headR*0.55,headCy-headR*1.15,pal.dark,headR*0.55,headR*0.7);
-    px(headCx+headR*0.15,headCy-headR*1.15,pal.dark,headR*0.55,headR*0.7);
-    ellipseCells(headCx,headCy,headR,headR*0.92).forEach(([gx,gy])=>px(gx,gy,pal.body));
-    // careta clara en el hocico, como un lobo de verdad
-    ellipseCells(headCx+headR*0.55,headCy+headR*0.2,headR*0.55,headR*0.45).forEach(([gx,gy])=>px(gx,gy,pal.belly));
-    px(headCx+headR*0.95,headCy+headR*0.15,pal.dark,headR*0.28,headR*0.22);
-    // patas
-    [[-0.75,'front'],[-0.15,'front'],[0.35,'back'],[0.82,'back']].forEach(([ox])=>{
-      px(cx+bodyRx*ox-rx*0.13,cy+bodyRy*0.55,pal.dark,rx*0.26,ry*0.62);
-      px(cx+bodyRx*ox-rx*0.13,cy+bodyRy*1.05,pal.dark2||pal.dark,rx*0.26,ry*0.18);
-    });
+    if(isAvian){
+      // variante de patas de ave: cabeza mas redonda, pico en vez de hocico, patas finas de un solo dedo
+      ellipseCells(headCx,headCy,headR*0.92,headR*0.92).forEach(([gx,gy])=>px(gx,gy,pal.body));
+      px(headCx+headR*0.75,headCy+headR*0.05,pal.accent,headR*0.55,headR*0.28); // pico
+      px(headCx-headR*0.3,headCy-headR*1.05,pal.dark,headR*0.3,headR*0.5); // cresta
+      [[-0.55,'front'],[0.55,'back']].forEach(([ox])=>{
+        px(cx+bodyRx*ox-rx*0.06,cy+bodyRy*0.5,pal.accent,rx*0.13,ry*0.75);
+        px(cx+bodyRx*ox-rx*0.14,cy+bodyRy*1.2,pal.dark,rx*0.3,ry*0.12);
+      });
+    } else {
+      // orejas, detrás de la cabeza
+      px(headCx-headR*0.55,headCy-headR*1.15,pal.dark,headR*0.55,headR*0.7);
+      px(headCx+headR*0.15,headCy-headR*1.15,pal.dark,headR*0.55,headR*0.7);
+      ellipseCells(headCx,headCy,headR,headR*0.92).forEach(([gx,gy])=>px(gx,gy,pal.body));
+      // careta clara en el hocico, como un lobo de verdad
+      ellipseCells(headCx+headR*0.55,headCy+headR*0.2,headR*0.55,headR*0.45).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+      px(headCx+headR*0.95,headCy+headR*0.15,pal.dark,headR*0.28,headR*0.22);
+      // patas
+      [[-0.75,'front'],[-0.15,'front'],[0.35,'back'],[0.82,'back']].forEach(([ox])=>{
+        px(cx+bodyRx*ox-rx*0.13,cy+bodyRy*0.55,pal.dark,rx*0.26,ry*0.62);
+        px(cx+bodyRx*ox-rx*0.13,cy+bodyRy*1.05,pal.dark2||pal.dark,rx*0.26,ry*0.18);
+      });
+    }
     return { headCx, headCy, headR };
   }
+  function pet_bodyShapeIsAvian(pal){
+    return pet && (pet.bodyShape==='esbelto' || pet.bodyShape==='triangular');
+  }
   function drawBodyHumanoide(cx,cy,rx,ry,pal){
+    const isMystic = pet && (pet.bodyShape==='alargado' || pet.bodyShape==='ovalado');
     const headR=ry*0.42, headCx=cx, headCy=cy-ry*0.42;
     const torsoW=rx*0.95, torsoH=ry*0.95;
-    // piernas y brazos primero, para que el torso quede encima
-    px(cx-torsoW*0.65,cy+torsoH*0.35,pal.dark,rx*0.24,ry*0.85); // brazo izq
-    px(cx+torsoW*0.41,cy+torsoH*0.35,pal.dark,rx*0.24,ry*0.85); // brazo der
-    px(cx-torsoW*0.32,cy+torsoH*0.85,pal.body,rx*0.28,ry*0.85); // pierna izq
-    px(cx+torsoW*0.04,cy+torsoH*0.85,pal.body,rx*0.28,ry*0.85); // pierna der
-    px(cx-torsoW*0.34,cy+torsoH*1.55,pal.dark,rx*0.32,ry*0.22); // bota izq
-    px(cx+torsoW*0.02,cy+torsoH*1.55,pal.dark,rx*0.32,ry*0.22); // bota der
-    px(cx-torsoW*0.48,cy-torsoH*0.05,pal.body,torsoW,torsoH); // torso
-    px(cx-torsoW*0.3,cy-torsoH*0.02,pal.dark,torsoW*0.6,torsoH*0.75); // peto
-    // pelo y cabeza
-    px(headCx-headR*1.05,headCy-headR*1.15,pal.dark,headR*2.1,headR*0.7);
-    ellipseCells(headCx,headCy,headR,headR*0.95).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    // brazos, mas pegados al torso que antes, para que no se salgan tanto a los lados
+    px(cx-torsoW*0.52,cy+torsoH*0.35,pal.dark,rx*0.22,ry*0.85);
+    px(cx+torsoW*0.32,cy+torsoH*0.35,pal.dark,rx*0.22,ry*0.85);
+    if(isMystic){
+      // variante mística: una túnica en vez de piernas separadas, con capucha
+      px(cx-torsoW*0.4,cy+torsoH*0.7,pal.dark,torsoW*0.82,ry*1.15); // tunica, mas ancha abajo
+      px(cx-torsoW*0.5,cy-torsoH*0.05,pal.body,torsoW,torsoH); // torso
+      px(cx-torsoW*0.32,cy-torsoH*0.02,pal.accent,torsoW*0.62,torsoH*0.7); // adorno del pecho
+      px(headCx-headR*1.15,headCy-headR*1.3,pal.dark,headR*2.3,headR*1.3); // capucha, envolviendo la cabeza
+      ellipseCells(headCx,headCy+headR*0.1,headR*0.85,headR*0.85).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    } else {
+      px(cx-torsoW*0.32,cy+torsoH*0.85,pal.body,rx*0.28,ry*0.85); // pierna izq
+      px(cx+torsoW*0.04,cy+torsoH*0.85,pal.body,rx*0.28,ry*0.85); // pierna der
+      px(cx-torsoW*0.34,cy+torsoH*1.55,pal.dark,rx*0.32,ry*0.22); // bota izq
+      px(cx+torsoW*0.02,cy+torsoH*1.55,pal.dark,rx*0.32,ry*0.22); // bota der
+      px(cx-torsoW*0.48,cy-torsoH*0.05,pal.body,torsoW,torsoH); // torso
+      px(cx-torsoW*0.3,cy-torsoH*0.02,pal.dark,torsoW*0.6,torsoH*0.75); // peto
+      // pelo y cabeza
+      px(headCx-headR*1.05,headCy-headR*1.15,pal.dark,headR*2.1,headR*0.7);
+      ellipseCells(headCx,headCy,headR,headR*0.95).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    }
     return { headCx, headCy, headR };
   }
   function drawBodyFantasy(cx,cy,rx,ry,pal){
-    const bodyRx=rx*0.85, bodyRy=ry*0.68;
-    // cola larga curvándose hacia atrás
-    px(cx-bodyRx*1.3,cy+bodyRy*0.1,pal.body,rx*0.5,ry*0.22);
-    px(cx-bodyRx*1.7,cy-bodyRy*0.15,pal.dark,rx*0.3,ry*0.18);
-    // alas, detrás del cuerpo
-    px(cx-bodyRx*0.3,cy-bodyRy*1.5,pal.dark,rx*0.7,ry*1.15);
-    px(cx+bodyRx*0.1,cy-bodyRy*1.55,pal.accent,rx*0.55,ry*0.9);
-    ellipseCells(cx,cy,bodyRx,bodyRy).forEach(([gx,gy])=>px(gx,gy,pal.body));
-    ellipseCells(cx,cy+bodyRy*0.4,bodyRx*0.55,bodyRy*0.4).forEach(([gx,gy])=>px(gx,gy,pal.belly));
-    // patas
-    px(cx-bodyRx*0.5,cy+bodyRy*0.75,pal.dark,rx*0.22,ry*0.4);
-    px(cx+bodyRx*0.3,cy+bodyRy*0.75,pal.dark,rx*0.22,ry*0.4);
-    // cuello curvado, en dos tramos, hacia arriba y adelante
-    const headR=ry*0.4, headCx=cx+bodyRx*0.95, headCy=cy-bodyRy*1.5;
-    px(cx+bodyRx*0.55,cy-bodyRy*0.4,pal.body,rx*0.32,ry*0.6);
-    px(cx+bodyRx*0.78,cy-bodyRy*1.05,pal.body,rx*0.3,ry*0.55);
-    // pua/cresta en el cuello
-    px(headCx-headR*0.3,headCy-headR*0.6,pal.dark,headR*0.4,headR*0.8);
+    // dragón desde cero, con piezas bien separadas para que no se amontonen — cuerpo compacto, cola
+    // detrás, alas encima, y un cuello en dos tramos que sube y se curva hacia la cabeza
+    const isWyvern = pet && (pet.bodyShape==='esbelto' || pet.bodyShape==='triangular');
+    const bodyCx=cx-rx*0.12, bodyCy=cy+ry*0.18;
+    const bodyRx=rx*0.62, bodyRy=ry*0.46;
+    // cola: se ve claramente saliendo hacia atrás del cuerpo, ahora bien pegada a él
+    px(bodyCx-bodyRx*1.15,bodyCy+bodyRy*0.15,pal.body,rx*0.42,ry*0.26);
+    px(bodyCx-bodyRx*1.5,bodyCy+bodyRy*0.5,pal.dark,rx*(isWyvern?0.4:0.24),ry*0.22);
+    if(isWyvern){
+      // variante vívora: sin patas delanteras, alas mucho mas grandes, cola larga terminada en punta
+      px(bodyCx-bodyRx*1.85,bodyCy+bodyRy*0.75,pal.dark,rx*0.22,ry*0.16);
+      px(bodyCx-bodyRx*0.35,bodyCy-bodyRy*2.7,pal.dark,rx*0.85,ry*1.55);
+      px(bodyCx+bodyRx*0.35,bodyCy-bodyRy*2.75,pal.accent,rx*0.62,ry*1.15);
+      px(bodyCx-bodyRx*0.2,bodyCy+bodyRy*0.9,pal.dark,rx*0.24,ry*0.5); // solo dos patas traseras
+    } else {
+      // alas: dos triángulos simples, bien arriba del cuerpo, sin tocar el cuello
+      px(bodyCx-bodyRx*0.15,bodyCy-bodyRy*2.3,pal.dark,rx*0.62,ry*1.15);
+      px(bodyCx+bodyRx*0.25,bodyCy-bodyRy*2.35,pal.accent,rx*0.46,ry*0.85);
+      // patas, debajo del cuerpo, bien plantadas
+      px(bodyCx-bodyRx*0.5,bodyCy+bodyRy*0.85,pal.dark,rx*0.2,ry*0.42);
+      px(bodyCx+bodyRx*0.15,bodyCy+bodyRy*0.85,pal.dark,rx*0.2,ry*0.42);
+    }
+    // cuerpo
+    ellipseCells(bodyCx,bodyCy,bodyRx,bodyRy).forEach(([gx,gy])=>px(gx,gy,pal.body));
+    ellipseCells(bodyCx,bodyCy+bodyRy*0.35,bodyRx*0.55,bodyRy*0.4).forEach(([gx,gy])=>px(gx,gy,pal.belly));
+    // cuello: dos tramos que suben desde el hombro y se curvan hacia la cabeza, bien pegados entre sí
+    const neckBaseX=bodyCx+bodyRx*0.72, neckBaseY=bodyCy-bodyRy*0.75;
+    px(neckBaseX-1.3,neckBaseY-ry*0.55,pal.body,2.6,ry*0.6);
+    const headR=ry*0.38, headCx=neckBaseX+1.6, headCy=neckBaseY-ry*1.15;
+    px(headCx-1.5,headCy+headR*0.35,pal.body,2.9,ry*0.42);
+    // pua/cresta justo detrás de la cabeza
+    px(headCx-headR*0.35,headCy-headR*1.05,pal.dark,headR*0.42,headR*0.65);
     ellipseCells(headCx,headCy,headR,headR*0.9).forEach(([gx,gy])=>px(gx,gy,pal.body));
     return { headCx, headCy, headR };
   }
   function drawBodyBicho(cx,cy,rx,ry,pal){
+    const isSpider = pet && (pet.bodyShape==='esbelto' || pet.bodyShape==='anguloso');
     const abdomenRx=rx*0.85, abdomenRy=ry*0.62;
+    if(isSpider){
+      // variante araña: cuerpo redondo, ocho patas finas saliendo a los lados, sin cabeza separada
+      for(let i=-2;i<=2;i+=2){
+        px(cx+i*abdomenRx*0.28,cy+abdomenRy*0.6,pal.dark,rx*0.05,ry*0.55);
+        px(cx+i*abdomenRx*0.28-rx*0.14,cy+abdomenRy*1.0,pal.dark,rx*0.05,ry*0.3);
+        px(cx+i*abdomenRx*0.28,cy-abdomenRy*0.55,pal.dark,rx*0.05,ry*0.4);
+      }
+      ellipseCells(cx,cy,abdomenRx*0.85,abdomenRy*0.85).forEach(([gx,gy])=>px(gx,gy,pal.dark));
+      const headR=ry*0.36, headCx=cx+abdomenRx*0.55, headCy=cy-abdomenRy*0.1;
+      ellipseCells(headCx,headCy,headR,headR*0.9).forEach(([gx,gy])=>px(gx,gy,pal.dark));
+      px(headCx+headR*0.5,headCy-headR*0.3,pal.body,headR*0.35,headR*0.3);
+      px(headCx+headR*0.5,headCy+headR*0.3,pal.body,headR*0.35,headR*0.3);
+      return { headCx, headCy, headR };
+    }
     // patas, detrás del cuerpo, tres pares
     for(let i=-1;i<=1;i++){
-      px(cx-abdomenRx*0.3+i*abdomenRx*0.45,cy+abdomenRy*0.5,pal.dark,rx*0.06,ry*0.5);
-      px(cx-abdomenRx*0.3+i*abdomenRx*0.45-rx*0.16,cy+abdomenRy*0.9,pal.dark,rx*0.06,ry*0.3);
+      px(cx-abdomenRx*0.3+i*abdomenRx*0.4,cy+abdomenRy*0.5,pal.dark,rx*0.06,ry*0.5);
+      px(cx-abdomenRx*0.3+i*abdomenRx*0.4-rx*0.14,cy+abdomenRy*0.9,pal.dark,rx*0.06,ry*0.3);
     }
     ellipseCells(cx-abdomenRx*0.15,cy,abdomenRx,abdomenRy).forEach(([gx,gy])=>px(gx,gy,pal.dark));
-    // bandas del caparazon
-    for(let i=0;i<3;i++){ px(cx-abdomenRx*0.9+i*abdomenRx*0.65,cy-abdomenRy*0.9,pal.body,rx*0.06,ry*1.8); }
+    // bandas del caparazon, mas cortas para que no sobresalgan del cuerpo
+    for(let i=0;i<3;i++){ px(cx-abdomenRx*0.75+i*abdomenRx*0.55,cy-abdomenRy*0.55,pal.body,rx*0.06,ry*1.1); }
     const headR=ry*0.4, headCx=cx+abdomenRx*0.85, headCy=cy-abdomenRy*0.05;
     ellipseCells(headCx,headCy,headR,headR*0.9).forEach(([gx,gy])=>px(gx,gy,pal.body));
     // antenas
@@ -2089,10 +2215,11 @@ body{padding:0;align-items:stretch;}
       hp: 55 + floor*13,
       power: 6 + Math.floor(floor*2.4),
       sprite: {
-        stage: mStage, frame:0, sick:false, sleeping:false,
+        stage: mStage, frame:0, sick:false, sleeping:false, isMonster:true,
         temperament: rand()<0.5?'Activo':'Tranquilo',
         path: ['luz','sombra','equilibrio'][Math.floor(rand()*3)],
         hue: Math.floor(rand()*360),
+        archetype: ['bestia','fantasia','bicho','criatura'][Math.floor(rand()*4)],
         bodyShape: weightedPick(rand, EVO_SHAPE_OPTS, w.shape),
         featureType: weightedPick(rand, EVO_FEAT_OPTS, w.feat),
         eyeStyle: ['rasgados','ciclope','trio'][Math.floor(rand()*3)],
@@ -2469,7 +2596,8 @@ body{padding:0;align-items:stretch;}
       }
       useCanvas(dummyCanvas2D);
       drawCreature({...traits, frame:pet.frame||0, sleeping:false, sick:false}, true, 12, 13.5);
-      s.ctx2.drawImage(dummyCanvas2D, -dummyCanvas2D.width/(2*cell), -dummyCanvas2D.height/(1.55*cell), dummyCanvas2D.width/cell, dummyCanvas2D.height/cell);
+      const spriteSize = 190*scaleFactor; // tamaño real en pantalla del sprite — antes esto salía en apenas 24px sin querer
+      s.ctx2.drawImage(dummyCanvas2D, -spriteSize/2, -spriteSize*0.62, spriteSize, spriteSize);
       useScreenCanvas();
       s.ctx2.restore();
     });
@@ -2578,40 +2706,30 @@ body{padding:0;align-items:stretch;}
   function advanceCharges3D(){ /* la carga de Especial ahora se dibuja directamente en drawBattleFighters2D */ }
 
   function render3DMiniPreview(canvasEl, traitsOrNull){
-    if(typeof THREE==='undefined' || !canvasEl) return;
-    const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+    if(!canvasEl) return;
     const w = canvasEl.clientWidth||84, h = canvasEl.clientHeight||84;
-    renderer.setSize(w, h, false);
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, w/h, .1, 20);
-    camera.position.set(0, .5, 4.7);
-    camera.lookAt(0, .2, 0);
-    scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x201030, 1.1));
-    const dir = new THREE.DirectionalLight(0xffffff, .9);
-    dir.position.set(2,3,4);
-    scene.add(dir);
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvasEl.width = w*dpr; canvasEl.height = h*dpr;
+    const ctx2 = canvasEl.getContext('2d');
+    ctx2.imageSmoothingEnabled = false;
+    ctx2.setTransform(dpr,0,0,dpr,0,0);
     const seedForTheme = (traitsOrNull && traitsOrNull.bgSeed!=null) ? traitsOrNull.bgSeed : ((traitsOrNull && traitsOrNull.hue!=null) ? traitsOrNull.hue : 210);
     const miniTheme = pickEnvTheme(seedForTheme);
     const miniColors = ENV_COLORS[miniTheme];
-    scene.background = new THREE.Color().setHSL(miniColors.sky[0]/360, miniColors.sky[1], miniColors.sky[2]);
-    scene.fog = new THREE.Fog(scene.background.getHex(), 5, 11);
-    const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(3.2, 24),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(miniColors.ground[0]/360, miniColors.ground[1], miniColors.ground[2]), roughness:.9, flatShading:true })
-    );
-    ground.rotation.x = -Math.PI/2;
-    ground.position.y = -1.2;
-    scene.add(ground);
-    const model = traitsOrNull ? build3DCreature(traitsOrNull) : build3DEgg();
-    scene.add(model);
-    const inst = { renderer, raf:null };
+    const inst = { raf:null };
     let bobT = Math.random()*10;
     function loop(){
-      bobT += 0.045;
-      model.rotation.y = 0.42; // mirando de frente, ya no gira sin parar
-      model.position.y = Math.sin(bobT)*0.05;
-      renderer.render(scene, camera);
+      bobT += 0.06;
+      ctx2.clearRect(0,0,w,h);
+      ctx2.fillStyle = `hsl(${miniColors.sky[0]}, ${Math.round(miniColors.sky[1]*100)}%, ${Math.round(miniColors.sky[2]*100)}%)`;
+      ctx2.fillRect(0,0,w,h);
+      useCanvas(dummyCanvas2D);
+      if(!traitsOrNull) drawEgg(Math.floor(bobT*10), seedForTheme);
+      else drawCreature({...traitsOrNull, frame:Math.floor(bobT*10), sleeping:false, sick:false}, true, 12, 13.5);
+      useScreenCanvas();
+      const bob = Math.sin(bobT)*3;
+      const spriteSize = Math.min(w,h)*0.95;
+      ctx2.drawImage(dummyCanvas2D, w/2-spriteSize/2, h/2-spriteSize/2+bob, spriteSize, spriteSize);
       inst.raf = requestAnimationFrame(loop);
     }
     loop();
@@ -3125,79 +3243,81 @@ body{padding:0;align-items:stretch;}
     document.getElementById('gameRhythm').onclick = ()=>{ sfx('tap'); if(canPlayGames()) startRhythmGame(); };
   }
 
-  // ---------- Esquiva en 3D de verdad: la propia mascota se mueve por el carril, no es un emoji plano ----------
+  // ---------- Atrapa la fruta en pixel art: la propia mascota se mueve por el suelo, no es un emoji plano ----------
   let dodgeScene3D = null;
   let catchScene3D = null;
   function stopCatchScene3D(){
     if(catchScene3D){
       if(catchScene3D.raf) cancelAnimationFrame(catchScene3D.raf);
-      disposeThreeRenderer(catchScene3D.renderer);
       catchScene3D = null;
     }
   }
   function initCatchScene3D(canvasEl){
-    if(typeof THREE==='undefined' || !canvasEl) return false;
-    const renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    if(!canvasEl) return false;
     const w = canvasEl.clientWidth||300, h = canvasEl.clientHeight||300;
-    renderer.setSize(w,h,false);
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x1a1030, 6, 16);
-    const camera = new THREE.PerspectiveCamera(48, w/h, .1, 100);
-    camera.position.set(0, 1.3, 5.6);
-    camera.lookAt(0, .6, 0);
-    scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x201030, .95));
-    const dir = new THREE.DirectionalLight(0xffffff, .8); dir.position.set(2,5,3); scene.add(dir);
-    // una franja de suelo donde se para a recoger, con los limites marcados a cada lado
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(4.6,2.2), new THREE.MeshStandardMaterial({color:0x241c3a, roughness:.9, flatShading:true}));
-    ground.rotation.x = -Math.PI/2; ground.position.set(0,-.9,0);
-    scene.add(ground);
-    [-1.85,1.85].forEach(x=>{
-      const post = new THREE.Mesh(new THREE.BoxGeometry(.08,1.6,.08), new THREE.MeshStandardMaterial({color:0x7d5dff, emissive:0x2a1a5a}));
-      post.position.set(x,-.1,0);
-      scene.add(post);
-    });
-    const model = pet.stage===0 ? build3DEgg() : build3DCreature(snapshotVisual(pet));
-    const scale = (model.userData.baseScale||1)*.55;
-    model.scale.setScalar(scale);
-    model.position.set(0,-.35,.3);
-    scene.add(model);
-    catchScene3D = { renderer, scene, camera, model, fruits:[], bobT:0, raf:null, x:0 };
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    canvasEl.width = w*dpr; canvasEl.height = h*dpr;
+    const ctx2 = canvasEl.getContext('2d');
+    ctx2.imageSmoothingEnabled = false;
+    ctx2.setTransform(dpr,0,0,dpr,0,0);
+    catchScene3D = { ctx2, canvasEl, w, h, fruits:[], bobT:0, raf:null, x:0 };
     function loop(){
       if(!catchScene3D) return;
-      catchScene3D.bobT += .05;
-      catchScene3D.model.position.y = -.35 + Math.sin(catchScene3D.bobT)*.05;
-      renderer.render(scene, camera);
+      catchScene3D.bobT += .08;
+      drawCatchScene2D();
       catchScene3D.raf = requestAnimationFrame(loop);
     }
     loop();
     return true;
   }
+  function drawCatchScene2D(){
+    const s = catchScene3D;
+    const {ctx2,w,h} = s;
+    ctx2.clearRect(0,0,w,h);
+    const grad = ctx2.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0,'#241c3a'); grad.addColorStop(1,'#1a1030');
+    ctx2.fillStyle = grad; ctx2.fillRect(0,0,w,h);
+    // suelo con los limites marcados a cada lado, como antes en 3D
+    ctx2.fillStyle = 'rgba(125,93,255,.18)'; ctx2.fillRect(0,h*.72,w,h*.28);
+    ctx2.strokeStyle = '#7d5dff'; ctx2.lineWidth = 3;
+    ctx2.beginPath(); ctx2.moveTo(w*.08,h*.4); ctx2.lineTo(w*.08,h*.72); ctx2.stroke();
+    ctx2.beginPath(); ctx2.moveTo(w*.92,h*.4); ctx2.lineTo(w*.92,h*.72); ctx2.stroke();
+    // el rango de x va de -1.85 a 1.85 (igual que antes en 3D), lo mapeo al ancho del lienzo
+    const toScreenX = (x)=> w*.5 + (x/1.85)*w*.42;
+    s.fruits.forEach(f=>{
+      const fx = toScreenX(f.x), fy = h*.12 + ((2.6-f.y)/3.8)*h*.55;
+      ctx2.fillStyle = f.color;
+      ctx2.save(); ctx2.translate(fx,fy); ctx2.rotate(f.rot||0);
+      ctx2.fillRect(-9,-9,18,18);
+      ctx2.restore();
+    });
+    const bob = Math.sin(s.bobT)*4;
+    useCanvas(dummyCanvas2D);
+    drawCreature({...snapshotVisual(pet), frame:pet.frame||0, sleeping:false, sick:false}, true, 12, 13.5);
+    useScreenCanvas();
+    const spriteSize = 110;
+    ctx2.drawImage(dummyCanvas2D, toScreenX(s.x)-spriteSize/2, h*.78-spriteSize+bob, spriteSize, spriteSize);
+  }
   function setCatchBasketX3D(x){
     if(!catchScene3D) return;
     catchScene3D.x = x;
-    catchScene3D.model.position.x = x;
   }
-  const CATCH_FRUIT_COLORS = [0xff4d6d, 0xffd23f, 0x8a3fff, 0xff8a3f, 0x4dff9e];
+  const CATCH_FRUIT_COLORS = ['#ff4d6d','#ffd23f','#8a3fff','#ff8a3f','#4dff9e'];
   function spawnCatchFruit3D(x){
     if(!catchScene3D) return;
     const color = CATCH_FRUIT_COLORS[Math.floor(Math.random()*CATCH_FRUIT_COLORS.length)];
-    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(.16,1), new THREE.MeshStandardMaterial({color, flatShading:true}));
-    mesh.position.set(x, 2.6, .1);
-    catchScene3D.scene.add(mesh);
-    catchScene3D.fruits.push({ mesh, x, caught:false });
+    catchScene3D.fruits.push({ x, y:2.6, color, rot:0, caught:false });
   }
   function advanceCatchFruits3D(speed){
     if(!catchScene3D) return { caught:0, missed:0 };
     let caught=0, missed=0;
     const remaining = [];
     catchScene3D.fruits.forEach(f=>{
-      f.mesh.position.y -= speed;
-      f.mesh.rotation.x += .1; f.mesh.rotation.y += .08;
-      if(f.mesh.position.y < -.15 && f.mesh.position.y > -.55 && Math.abs(f.x-catchScene3D.x) < .55){
-        caught++; catchScene3D.scene.remove(f.mesh);
-      } else if(f.mesh.position.y < -.9){
-        missed++; catchScene3D.scene.remove(f.mesh);
+      f.y -= speed; f.rot = (f.rot||0) + .15;
+      if(f.y < -.15 && f.y > -.55 && Math.abs(f.x-catchScene3D.x) < .55){
+        caught++;
+      } else if(f.y < -.9){
+        missed++;
       } else {
         remaining.push(f);
       }
@@ -3205,79 +3325,74 @@ body{padding:0;align-items:stretch;}
     catchScene3D.fruits = remaining;
     return { caught, missed };
   }
+  // ---------- Esquiva en pixel art: la propia mascota se mueve por el carril, no es un emoji plano ----------
   function stopDodgeScene3D(){
     if(dodgeScene3D){
       if(dodgeScene3D.raf) cancelAnimationFrame(dodgeScene3D.raf);
-      disposeThreeRenderer(dodgeScene3D.renderer);
       dodgeScene3D = null;
     }
   }
   function initDodgeScene3D(canvasEl){
-    if(typeof THREE==='undefined' || !canvasEl) return false;
-    const renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    if(!canvasEl) return false;
     const w = canvasEl.clientWidth||300, h = canvasEl.clientHeight||300;
-    renderer.setSize(w,h,false);
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x1a1030, 5, 15);
-    const camera = new THREE.PerspectiveCamera(55, w/h, .1, 100);
-    camera.position.set(0, 2.5, 4.4);
-    camera.lookAt(0, .1, -3);
-    scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x201030, .9));
-    const dir = new THREE.DirectionalLight(0xffffff, .8); dir.position.set(2,5,3); scene.add(dir);
-    // el carril por el que corre, alejándose hacia el fondo, con dos líneas marcando las calles
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3.2,30), new THREE.MeshStandardMaterial({color:0x241c3a, roughness:.9, flatShading:true}));
-    ground.rotation.x = -Math.PI/2; ground.position.set(0,-.6,-8);
-    scene.add(ground);
-    [-.75,.75].forEach(x=>{
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(.05,30), new THREE.MeshBasicMaterial({color:0x7d5dff}));
-      line.rotation.x = -Math.PI/2; line.position.set(x,-.59,-8);
-      scene.add(line);
-    });
-    const model = pet.stage===0 ? build3DEgg() : build3DCreature(snapshotVisual(pet));
-    const scale = (model.userData.baseScale||1)*.5;
-    model.scale.setScalar(scale);
-    model.position.set(.75,-.2,0);
-    scene.add(model);
-    dodgeScene3D = { renderer, scene, camera, model, obstacles:[], bobT:0, raf:null, lane:1 };
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    canvasEl.width = w*dpr; canvasEl.height = h*dpr;
+    const ctx2 = canvasEl.getContext('2d');
+    ctx2.imageSmoothingEnabled = false;
+    ctx2.setTransform(dpr,0,0,dpr,0,0);
+    dodgeScene3D = { ctx2, canvasEl, w, h, obstacles:[], bobT:0, raf:null, lane:1 };
     function loop(){
       if(!dodgeScene3D) return;
-      dodgeScene3D.bobT += .05;
-      dodgeScene3D.model.position.y = -.2 + Math.sin(dodgeScene3D.bobT)*.06;
-      renderer.render(scene, camera);
+      dodgeScene3D.bobT += .09;
+      drawDodgeScene2D();
       dodgeScene3D.raf = requestAnimationFrame(loop);
     }
     loop();
     return true;
   }
+  function drawDodgeScene2D(){
+    const s = dodgeScene3D;
+    const {ctx2,w,h} = s;
+    ctx2.clearRect(0,0,w,h);
+    const grad = ctx2.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0,'#1a1030'); grad.addColorStop(1,'#2a1c3a');
+    ctx2.fillStyle = grad; ctx2.fillRect(0,0,w,h);
+    const laneXs = [w*.3, w*.7];
+    ctx2.strokeStyle = 'rgba(125,93,255,.55)'; ctx2.lineWidth = 3;
+    laneXs.forEach(x=>{ ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,h); ctx2.stroke(); });
+    // los obstaculos van de z=-13 (lejos) a z=1.5 (encima) — los dibujo mas grandes y mas abajo cuanto mas cerca están
+    s.obstacles.forEach(o=>{
+      const near = Math.max(0, Math.min(1, (o.z+13)/13.5));
+      const oy = h*.1 + near*h*.62, size = 14+near*34;
+      ctx2.fillStyle = o.color;
+      ctx2.beginPath(); ctx2.arc(laneXs[o.lane], oy, size/2, 0, Math.PI*2); ctx2.fill();
+    });
+    const bob = Math.sin(s.bobT)*4;
+    useCanvas(dummyCanvas2D);
+    drawCreature({...snapshotVisual(pet), frame:pet.frame||0, sleeping:false, sick:false}, true, 12, 13.5);
+    useScreenCanvas();
+    const spriteSize = 110;
+    ctx2.drawImage(dummyCanvas2D, laneXs[s.lane]-spriteSize/2, h*.78-spriteSize+bob, spriteSize, spriteSize);
+  }
   function setDodgeLane3D(lane){
     if(!dodgeScene3D) return;
     dodgeScene3D.lane = lane;
-    dodgeScene3D.model.position.x = lane===0 ? -.75 : .75;
   }
   function spawnDodgeObstacle3D(lane){
     if(!dodgeScene3D) return;
-    const kinds = [ {color:0x9a8a72, emissive:0x000000}, {color:0xff8844, emissive:0x552200}, {color:0xff4444, emissive:0x550000} ];
-    const k = kinds[Math.floor(Math.random()*kinds.length)];
-    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(.22,0), new THREE.MeshStandardMaterial({color:k.color, emissive:k.emissive, emissiveIntensity:.6, flatShading:true}));
-    mesh.position.set(lane===0?-.75:.75, .05, -13);
-    dodgeScene3D.scene.add(mesh);
-    dodgeScene3D.obstacles.push({ mesh, lane, hit:false });
+    const colors = ['#9a8a72','#ff8844','#ff4444'];
+    dodgeScene3D.obstacles.push({ lane, z:-13, color: colors[Math.floor(Math.random()*colors.length)], hit:false });
   }
   function advanceDodgeObstacles3D(speed){
     if(!dodgeScene3D) return [];
     const hits = [];
     dodgeScene3D.obstacles.forEach(o=>{
-      o.mesh.position.z += speed;
-      o.mesh.rotation.x += .08; o.mesh.rotation.y += .06;
-      if(!o.hit && o.mesh.position.z > -.3 && o.mesh.position.z < .5 && o.lane===dodgeScene3D.lane){
+      o.z += speed;
+      if(!o.hit && o.z > -.3 && o.z < .5 && o.lane===dodgeScene3D.lane){
         o.hit = true; hits.push(o);
       }
     });
-    dodgeScene3D.obstacles = dodgeScene3D.obstacles.filter(o=>{
-      if(o.mesh.position.z > 1.5){ dodgeScene3D.scene.remove(o.mesh); return false; }
-      return true;
-    });
+    dodgeScene3D.obstacles = dodgeScene3D.obstacles.filter(o=> o.z <= 1.5);
     return hits;
   }
 
@@ -3686,6 +3801,7 @@ body{padding:0;align-items:stretch;}
       <button class="close-x" id="closeMore">✕</button>
       <h3>MÁS OPCIONES</h3>
       <div class="modal-actions" style="flex-direction:column;gap:10px;">
+        <button class="status-btn" id="moreTalk" style="background:linear-gradient(135deg,#5a3d8a,#8a5dc0);">💬 Hablar con ${pet.name}</button>
         <button class="status-btn" id="moreMed" ${(!pet.sick||!pet.alive)?'disabled':''}>💊 Medicina</button>
         <button class="status-btn" id="moreInfo">📋 Estado</button>
         <button class="status-btn" id="moreBattle">⚔️ Batalla</button>
@@ -3702,6 +3818,7 @@ body{padding:0;align-items:stretch;}
     const close = ()=>{ el.remove(); refreshScrollLock(); };
     document.getElementById('closeMore').onclick = close;
     el.addEventListener('click',(e)=>{ if(e.target===el) close(); });
+    document.getElementById('moreTalk').onclick = ()=>{ close(); openTalkModal(); };
     document.getElementById('moreMed').onclick = ()=>{ useMedicine(); close(); };
     document.getElementById('moreInfo').onclick = ()=>{ close(); openInfoModal(); };
     document.getElementById('moreBattle').onclick = ()=>{ close(); openBattleModal(); };
@@ -3722,6 +3839,70 @@ body{padding:0;align-items:stretch;}
       close();
       showToast(pet.notifsOn ? 'Avisos de hambre activados 🔔' : 'Avisos de hambre desactivados');
     };
+  }
+  const TALK_GREETINGS_MORNING = [
+    "Buenos días. Me alegra que hayas venido a verme antes de empezar el día.",
+    "¡Buenos días! Solo con que estés aquí, ya ha sido un buen comienzo.",
+    "Buenos días. Sea como sea el día que tengas por delante, yo voy a seguir aquí."
+  ];
+  const TALK_GREETINGS_AFTERNOON = [
+    "Buenas tardes. Me gusta que te pases a verme, aunque sea un ratito.",
+    "Hola otra vez. No hace falta que digas nada, con que estés aquí ya vale.",
+    "Buenas tardes. Espero que el día te esté tratando bien — y si no, aquí me tienes."
+  ];
+  const TALK_GREETINGS_NIGHT = [
+    "Buenas noches. Si el día ha sido largo, aquí puedes quedarte un rato tranquilo.",
+    "Hola. Ya casi es de noche — gracias por venir a verme antes de descansar.",
+    "Buenas noches. Pase lo que pase hoy, me alegra terminar el día contigo."
+  ];
+  const TALK_MOOD_GOOD = [
+    "¡Me alegro muchísimo! Disfruta ese buen momento todo lo que puedas.",
+    "Eso es genial de oír. Ojalá el día siga así de bien.",
+    "¡Qué bien! Se te nota en la cara, y eso me hace feliz a mí también."
+  ];
+  const TALK_MOOD_OK = [
+    "Un día normal también cuenta, no todo tiene que ser extraordinario.",
+    "Está bien tener días así, tranquilos. Aquí me tienes igualmente.",
+    "A veces \"regular\" es simplemente un día más, y no pasa nada."
+  ];
+  const TALK_MOOD_BAD = [
+    "Siento que estés así. No hace falta que finjas estar bien aquí conmigo.",
+    "Lamento que el día esté siendo difícil. Tómate el tiempo que necesites.",
+    "A veces los días pesan más de la cuenta. Está bien sentirse así de vez en cuando."
+  ];
+  function openTalkModal(){
+    sfx('tap');
+    const hour = new Date().getHours();
+    const pool = hour<12 ? TALK_GREETINGS_MORNING : hour<20 ? TALK_GREETINGS_AFTERNOON : TALK_GREETINGS_NIGHT;
+    const greeting = pool[Math.floor(Math.random()*pool.length)];
+    const el = document.createElement('div');
+    el.className='modal-backdrop'; el.id='talkModal';
+    el.innerHTML = `<div class="modal">
+      <button class="close-x" id="closeTalk">✕</button>
+      <h3>💬 ${pet.name}</h3>
+      <p id="talkMsg" class="small-note" style="font-size:14px;line-height:1.5;">${greeting}</p>
+      <p class="small-note" style="margin-top:14px;">¿Cómo estás hoy?</p>
+      <div class="modal-actions" style="flex-direction:column;gap:8px;">
+        <button class="status-btn" id="moodGood">😊 Bien</button>
+        <button class="status-btn" id="moodOk">😐 Normal</button>
+        <button class="status-btn" id="moodBad">😔 No muy bien</button>
+      </div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(el);
+    refreshScrollLock();
+    const close = ()=>{ el.remove(); refreshScrollLock(); };
+    document.getElementById('closeTalk').onclick = close;
+    el.addEventListener('click',(e)=>{ if(e.target===el) close(); });
+    function respond(pool, extra){
+      sfx('tap');
+      const msg = pool[Math.floor(Math.random()*pool.length)];
+      document.getElementById('talkMsg').textContent = msg + (extra ? ('\n\n'+extra) : '');
+      pet.happy = clamp(pet.happy + 2);
+      savePet();
+    }
+    document.getElementById('moodGood').onclick = ()=> respond(TALK_MOOD_GOOD);
+    document.getElementById('moodOk').onclick = ()=> respond(TALK_MOOD_OK);
+    document.getElementById('moodBad').onclick = ()=> respond(TALK_MOOD_BAD, 'Si sientes que esto te pesa mucho, hablar con alguien de confianza o un profesional puede ayudar de verdad — yo estoy aquí para acompañarte, pero no puedo sustituir eso.');
   }
   document.getElementById('btnMore').onclick = openMoreMenu;
   function openTreeModal(){
@@ -5692,6 +5873,33 @@ body{padding:0;align-items:stretch;}
   window.addEventListener('resize', ()=>{ clearTimeout(mainScene3D&&mainScene3D._rT); resizeMainScene3D(); });
 
   let usedThreeFallback = false;
+  let petWander = null;
+  function updatePetWander(){
+    const now = performance.now();
+    if(!petWander){
+      petWander = { x:12, y:13.5, targetX:12, targetY:13.5, nextMoveAt:now+1800, behavior:'quieta', hopPhase:0, spinPhase:0, faceDir:1 };
+    }
+    const w = petWander;
+    if(now >= w.nextMoveAt){
+      // sorteo qué hace ahora: pasear a un punto nuevo, dar un saltito, girar sobre sí misma, o quedarse quieta
+      const behaviors = pet.sleeping ? ['quieta'] : ['pasear','pasear','quieta','saltar','girar','quieta','oler'];
+      w.behavior = behaviors[Math.floor(Math.random()*behaviors.length)];
+      if(w.behavior==='pasear'){
+        const newX = 6 + Math.random()*12;
+        w.faceDir = newX >= w.x ? 1 : -1;
+        w.targetX = newX;
+        w.targetY = 10.5 + Math.random()*6;
+      }
+      w.nextMoveAt = now + (w.behavior==='pasear' ? 2600+Math.random()*2200 : 1800+Math.random()*2400);
+    }
+    if(w.behavior==='pasear'){
+      w.x += (w.targetX-w.x)*0.045;
+      w.y += (w.targetY-w.y)*0.045;
+    }
+    w.hopPhase = w.behavior==='saltar' ? w.hopPhase+0.22 : 0;
+    w.spinPhase = w.behavior==='girar' ? w.spinPhase+0.16 : 0;
+    return w;
+  }
   function render2DFallback(){
     // si el 3D no está disponible por lo que sea (sin conexión al CDN, WebGL no soportado...),
     // no dejo la pantalla en blanco: vuelvo al dibujo en pixel art de toda la vida, que no depende de nada externo
@@ -5704,7 +5912,15 @@ body{padding:0;align-items:stretch;}
     }
     useCanvas(screenCanvas);
     if(pet.stage===0) drawEgg(pet.frame, pet.bgSeed);
-    else drawCreature(pet);
+    else {
+      const w = updatePetWander();
+      const hop = w.behavior==='saltar' ? -Math.abs(Math.sin(w.hopPhase))*1.6 : 0;
+      if(w.behavior==='girar'){ ctx.save(); ctx.translate(w.x*cell, (w.y)*cell); ctx.rotate(Math.sin(w.spinPhase)*0.5); ctx.translate(-w.x*cell, -(w.y)*cell); }
+      if(w.faceDir<0){ ctx.save(); ctx.translate(w.x*2*cell,0); ctx.scale(-1,1); }
+      drawCreature(pet, false, w.x, w.y+hop);
+      if(w.faceDir<0) ctx.restore();
+      if(w.behavior==='girar') ctx.restore();
+    }
     useScreenCanvas();
   }
   let threeFailedOnce = false;
