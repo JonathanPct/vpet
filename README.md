@@ -1,18 +1,25 @@
 # BYTEMON
 
-Empezó como un Tamagotchi cualquiera de un rato libre y se me fue de las manos. Ahora
-tiene mazmorra, arena online, árbol evolutivo con elección real, y hasta modelos 3D
-generados a partir de los mismos rasgos que antes dibujaba pixel a pixel. Sigue siendo
-un único `index.html` — sin frameworks, sin build, se abre y ya está.
+Empezó como un Tamagotchi cualquiera de un rato libre y se me fue de las manos. Todo
+en pixel art, dibujado a mano con bloques — sin 3D, sin frameworks, sin build. Un único
+`index.html`, se abre y ya está.
 
-Nace un huevo, lo cuidas (comida, juego, limpieza, sueño), y al llegar a "Joven" no
-decido yo la forma final: te enseño 3 opciones generadas al azar y eliges. Con el color,
-el cuerpo, el rasgo y el patrón mezclados, difícil que le toque lo mismo a dos personas.
+Nace un huevo, lo cuidas (comida, juego, limpieza, sueño), y en **cada** etapa de su
+vida — al nacer, al crecer, y en cada evolución hasta la forma final — te enseño tres
+opciones generadas al azar y eliges tú. Con el color, la raza, el rasgo y el patrón
+mezclados, difícil que le toque lo mismo a dos personas.
 
-De ahí para arriba: mazmorra con monstruos por piso y stats de RPG de verdad, arena para
-pelear local u online contra el bicho de otro en tiempo real, minijuegos para subir el
-ánimo sin pelear, y vista 3D de la mascota y la mazmorra que cambia de expresión según
-cómo esté — feliz, con hambre, cansada, enferma, dormida.
+Desde la evolución grande en adelante puede tocarle una de cinco razas (animal, mítica,
+humanoide, insecto, y variantes de cada una — más de veinte tipos distintos en total,
+desde un lobo o un dragón hasta un minotauro, una sirena o un kraken), cada una con sus
+propios rasgos pegados a la misma base fiable, sin patas ni brazos sueltos que se
+desconecten del cuerpo.
+
+De ahí para arriba: mazmorra con monstruos por piso y stats de RPG de verdad, arena
+para pelear local u online contra el bicho de otro en tiempo real, minijuegos para
+subir el ánimo sin pelear, y un compañero con el que se puede hablar de verdad — con
+memoria de lo que le has contado en la misma charla, y una decena de temas distintos
+que van cambiando según por dónde va la conversación.
 
 ## Archivos
 
